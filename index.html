@@ -59,7 +59,7 @@
 
   <script>
     'use strict';
-    const KEY = 'skyledger_v2';
+    const KEY = 'skyledger_v3';
     const ACCOUNT_NAMES = { cash: 'Cash Drawer', bank: 'Bank Account', upi: 'UPI', card: 'Card' };
     
     const initial = () => ({
@@ -93,7 +93,7 @@
         localStorage.setItem(KEY, JSON.stringify(db));
         return true;
       } catch (e) {
-        alert('Storage error: Unable to save changes. Make sure your browser storage is enabled.');
+        alert('Storage error: Unable to save changes.');
         return false;
       }
     }
@@ -118,7 +118,7 @@
     }
 
     function uid() {
-      return Date.now().toString(36) + Math.random().toString(36.slice(2));
+      return Date.now().toString(36) + Math.random().toString(36).slice(2);
     }
 
     function amount(v) {
@@ -168,11 +168,15 @@
     }
 
     function render() {
-      document.getElementById('pageTitle').textContent = { register: 'Daily Register', parties: 'Party Khatabook', reports: 'Business Reports' }[tab];
-      document.querySelectorAll('.tab').forEach(x => {
-        x.className = 'tab flex flex-col items-center gap-1 text-xs font-semibold ' + (x.dataset.tab === tab ? 'text-sky-600' : 'text-slate-400');
-      });
-      document.getElementById('main').innerHTML = tab === 'register' ? renderRegister() : tab === 'parties' ? renderParties() : renderReports();
+      try {
+        document.getElementById('pageTitle').textContent = { register: 'Daily Register', parties: 'Party Khatabook', reports: 'Business Reports' }[tab];
+        document.querySelectorAll('.tab').forEach(x => {
+          x.className = 'tab flex flex-col items-center gap-1 text-xs font-semibold ' + (x.dataset.tab === tab ? 'text-sky-600' : 'text-slate-400');
+        });
+        document.getElementById('main').innerHTML = tab === 'register' ? renderRegister() : tab === 'parties' ? renderParties() : renderReports();
+      } catch (err) {
+        console.error('Render error:', err);
+      }
     }
 
     function renderRegister() {
@@ -317,7 +321,6 @@
         </div>
         <div class="card p-5 mt-4">
           <h2 class="font-bold mb-2">Data & Statements</h2>
-          <p class="text-xs text-slate-500 mb-3">CSV includes all entries. JSON includes all backup data.</p>
           <div class="grid grid-cols-2 gap-2">
             <button data-action="csv" class="btn bg-sky-50 text-sky-700 text-sm">Export CSV</button>
             <button data-action="backup" class="btn bg-sky-600 text-white text-sm">JSON Backup</button>
@@ -384,7 +387,7 @@
           <input name="id" type="hidden" value="${esc(id || '')}">
           <label class="block text-sm font-semibold">Name<input name="name" class="field mt-1" required maxlength="100" value="${esc(p.name)}"></label>
           <label class="block text-sm font-semibold">Type<select name="kind" class="field mt-1">${opts([['Customer', 'Customer'], ['Supplier', 'Supplier / Vendor']], p.kind)}</select></label>
-          <label class="block text-sm font-semibold">WhatsApp Phone (with country code)<input name="phone" class="field mt-1" placeholder="919876543210" value="${esc(p.phone)}"></label>
+          <label class="block text-sm font-semibold">WhatsApp Phone<input name="phone" class="field mt-1" placeholder="919876543210" value="${esc(p.phone)}"></label>
           <button class="btn bg-sky-600 text-white w-full">Save Contact</button>
         </form>
       `);
