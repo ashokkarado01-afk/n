@@ -6,6 +6,9 @@
   <title>SkyLedger • Daily Business Register</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <style>
     body { font-family: Inter, system-ui, sans-serif; background: #eaf2fa; }
     .phone { width: 410px; max-width: 100%; height: min(860px, calc(100dvh - 40px)); border: 9px solid #152c46; border-radius: 42px; box-shadow: 0 28px 75px #18365335; overflow: hidden; }
@@ -59,7 +62,22 @@
 
   <script>
     'use strict';
-    const KEY = 'skyledger_v5';
+    // 1. Firebase Configuration Keys
+    const firebaseConfig = {
+      apiKey: "AIzaSyCchPfwpN1A2P7pvIE1GPsutZw2ahj-37I",
+      authDomain: "mycashbook-74be5.firebaseapp.com",
+      projectId: "mycashbook-74be5",
+      storageBucket: "mycashbook-74be5.firebasestorage.app",
+      messagingSenderId: "870100611895",
+      appId: "1:870100611895:web:763e05ac88cf0d915620b2",
+      measurementId: "G-S9N5CYLCT3"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const dbCloud = firebase.firestore();
+
     const ACCOUNT_NAMES = { cash: 'Cash Drawer', bank: 'Bank Account', upi: 'UPI', card: 'Card' };
     
     const initial = () => ({
@@ -70,15 +88,51 @@
       transfers: []
     });
 
-    let db = load();
+    let db = initial();
+    let currentUserId = null;
     let tab = 'register';
     let date = today();
     let search = '';
     let partySearch = '';
 
-    function load() {
+    // Automatically sign in anonymously to create a cloud session
+    auth.signInAnonymously().then(userCredential => {
+      currentUserId = userCredential.user.uid;
+      loadFromCloud();
+    }).catch(error => {
+      console.error("Firebase auth error:", error);
+      // Fallback to local storage if offline or auth error occurs
+      db = loadLocal();
+      render();
+    });
+
+    function loadFromCloud() {
+      if (!currentUserId) return;
+      dbCloud.collection('users').doc(currentUserId).get().then(doc => {
+        if (doc.exists) {
+          const parsed = doc.data();
+          db = {
+            version: 1,
+            opening: parsed.opening || { cash: 0, bank: 0, upi: 0, card: 0 },
+            parties: Array.isArray(parsed.parties) ? parsed.parties : [],
+            entries: Array.isArray(parsed.entries) ? parsed.entries : [],
+            transfers: Array.isArray(parsed.transfers) ? parsed.transfers : []
+          };
+        } else {
+          db = loadLocal() || initial();
+          save();
+        }
+        render();
+      }).catch(err => {
+        console.error("Error loading cloud data:", err);
+        db = loadLocal();
+        render();
+      });
+    }
+
+    function loadLocal() {
       try {
-        const raw = localStorage.getItem(KEY);
+        const raw = localStorage.getItem('skyledger_v5');
         if (!raw) return initial();
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object') {
@@ -91,19 +145,24 @@
           };
         }
       } catch (e) {
-        console.error('Error loading data:', e);
+        console.error('Error loading local data:', e);
       }
       return initial();
     }
 
     function save() {
       try {
-        localStorage.setItem(KEY, JSON.stringify(db));
-        return true;
-      } catch (e) {
-        alert('Storage error: Unable to save to browser local storage.');
-        return false;
+        localStorage.setItem('skyledger_v5', JSON.stringify(db));
+      } catch(e) {}
+
+      if (currentUserId) {
+        dbCloud.collection('users').doc(currentUserId).set(db).then(() => {
+          console.log("Data synced to Firebase successfully.");
+        }).catch(e => {
+          console.error('Cloud save error:', e);
+        });
       }
+      return true;
     }
 
     function today() {
