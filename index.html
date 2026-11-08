@@ -7,9 +7,9 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <style>
-    body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #eaf2fa; }
+    body { font-family: Inter, system-ui, sans-serif; background: #eaf2fa; }
     .phone { width: 410px; max-width: 100%; height: min(860px, calc(100dvh - 40px)); border: 9px solid #152c46; border-radius: 42px; box-shadow: 0 28px 75px #18365335; overflow: hidden; }
-    .full { width: 100%; height: 100dvh; border: 0; border-radius: 0; box-shadow: none; }
+    .full { width: 100% !important; height: 100dvh !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
     .shell { height: 100%; display: flex; flex-direction: column; background: #f8fbff; }
     .scroll { overflow-y: auto; min-height: 0; flex: 1; scrollbar-width: thin; }
     .nav { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
@@ -59,7 +59,7 @@
 
   <script>
     'use strict';
-    const KEY = 'skyledger_v3';
+    const KEY = 'skyledger_v5';
     const ACCOUNT_NAMES = { cash: 'Cash Drawer', bank: 'Bank Account', upi: 'UPI', card: 'Card' };
     
     const initial = () => ({
@@ -81,7 +81,15 @@
         const raw = localStorage.getItem(KEY);
         if (!raw) return initial();
         const parsed = JSON.parse(raw);
-        if (parsed && parsed.version === 1) return parsed;
+        if (parsed && typeof parsed === 'object') {
+          return {
+            version: 1,
+            opening: parsed.opening || { cash: 0, bank: 0, upi: 0, card: 0 },
+            parties: Array.isArray(parsed.parties) ? parsed.parties : [],
+            entries: Array.isArray(parsed.entries) ? parsed.entries : [],
+            transfers: Array.isArray(parsed.transfers) ? parsed.transfers : []
+          };
+        }
       } catch (e) {
         console.error('Error loading data:', e);
       }
@@ -93,7 +101,7 @@
         localStorage.setItem(KEY, JSON.stringify(db));
         return true;
       } catch (e) {
-        alert('Storage error: Unable to save changes.');
+        alert('Storage error: Unable to save to browser local storage.');
         return false;
       }
     }
@@ -118,12 +126,12 @@
     }
 
     function uid() {
-      return Date.now().toString(36) + Math.random().toString(36).slice(2);
+      return Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
     }
 
-    function amount(v) {
-      const n = Number(v);
-      return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : NaN;
+    function parseNum(v) {
+      const n = parseFloat(v);
+      return isNaN(n) ? 0 : Math.round(n * 100) / 100;
     }
 
     function signed(e) {
@@ -137,8 +145,8 @@
       }
       for (const t of db.transfers) {
         if (!until || t.date <= until) {
-          b[t.from] -= t.amount;
-          b[t.to] += t.amount;
+          b[t.from] = (b[t.from] || 0) - t.amount;
+          b[t.to] = (b[t.to] || 0) + t.amount;
         }
       }
       return b;
@@ -205,8 +213,8 @@
           <button data-action="deposit" class="mt-4 w-full rounded-xl bg-white text-sky-700 font-bold py-3"><i class="fa-solid fa-building-columns mr-2"></i>Deposit Cash to Bank</button>
         </div>
         <div class="grid grid-cols-2 gap-3 mt-4">
-          <button data-action="add-in" class="btn bg-emerald-600 text-white"><i class="fa-solid fa-arrow-down mr-2"></i>Cash In</button>
-          <button data-action="add-out" class="btn bg-rose-600 text-white"><i class="fa-solid fa-arrow-up mr-2"></i>Cash Out</button>
+          <button data-action="add-in" class="btn bg-emerald-600 text-white hover:bg-emerald-700"><i class="fa-solid fa-arrow-down mr-2"></i>Cash In</button>
+          <button data-action="add-out" class="btn bg-rose-600 text-white hover:bg-rose-700"><i class="fa-solid fa-arrow-up mr-2"></i>Cash Out</button>
         </div>
         <div class="flex justify-between items-center mt-6 mb-3">
           <h2 class="font-bold">Account Balances</h2>
@@ -227,7 +235,7 @@
               <div class="font-bold text-sm">${esc(ACCOUNT_NAMES[r.from])} → ${esc(ACCOUNT_NAMES[r.to])}</div>
               <div class="text-xs text-slate-500">Internal transfer • ${esc(r.note || '')}</div>
             </div>
-            <div class="text-right"><b>${money(r.amount)}</b><button data-action="delete-transfer" data-id="${r.id}" class="block text-xs text-rose-500 ml-auto">Delete</button></div>
+            <div class="text-right"><b>${money(r.amount)}</b><button data-action="delete-transfer" data-id="${r.id}" class="block text-xs text-rose-500 ml-auto mt-1">Delete</button></div>
           </div>
         ` : `
           <div class="card p-3 mb-2 flex gap-3 items-center">
@@ -237,13 +245,13 @@
             <div class="flex-1 min-w-0">
               <div class="font-bold text-sm truncate">${esc(r.note || partyName(r.partyId))}</div>
               <div class="text-xs text-slate-500">${esc(ACCOUNT_NAMES[r.account])} • ${esc(r.status)}${r.partyId ? ' • ' + esc(partyName(r.partyId)) : ''}</div>
-              ${r.total > r.paid ? `<div class="text-xs text-amber-600">Due ${money(r.total - r.paid)}</div>` : ''}
+              ${r.total > r.paid ? `<div class="text-xs text-amber-600 font-semibold">Due ${money(r.total - r.paid)}</div>` : ''}
             </div>
             <div class="text-right">
               <div class="font-extrabold ${r.type === 'in' ? 'text-emerald-600' : 'text-rose-600'}">${r.type === 'in' ? '+' : '−'}${money(r.paid)}</div>
               <div class="flex gap-2 justify-end text-xs mt-1">
-                <button data-action="edit-entry" data-id="${r.id}" class="text-sky-600">Edit</button>
-                <button data-action="delete-entry" data-id="${r.id}" class="text-rose-500">Delete</button>
+                <button data-action="edit-entry" data-id="${r.id}" class="text-sky-600 font-bold">Edit</button>
+                <button data-action="delete-entry" data-id="${r.id}" class="text-rose-500 font-bold">Delete</button>
               </div>
             </div>
           </div>
@@ -322,10 +330,10 @@
         <div class="card p-5 mt-4">
           <h2 class="font-bold mb-2">Data & Statements</h2>
           <div class="grid grid-cols-2 gap-2">
-            <button data-action="csv" class="btn bg-sky-50 text-sky-700 text-sm">Export CSV</button>
-            <button data-action="backup" class="btn bg-sky-600 text-white text-sm">JSON Backup</button>
-            <button data-action="import" class="btn bg-slate-100 text-slate-700 text-sm">Import JSON</button>
-            <button data-action="opening" class="btn bg-slate-100 text-slate-700 text-sm">Opening Funds</button>
+            <button data-action="csv" class="btn bg-sky-50 text-sky-700 text-sm font-bold">Export CSV</button>
+            <button data-action="backup" class="btn bg-sky-600 text-white text-sm font-bold">JSON Backup</button>
+            <button data-action="import" class="btn bg-slate-100 text-slate-700 text-sm font-bold">Import JSON</button>
+            <button data-action="opening" class="btn bg-slate-100 text-slate-700 text-sm font-bold">Opening Funds</button>
           </div>
         </div>
       `;
@@ -351,44 +359,91 @@
       const v = e || { type, date, account: 'cash', status: 'full', total: '', paid: '', partyId: '', note: '' };
       
       showModal(header(e ? 'Edit Transaction' : type === 'in' ? 'Record Cash In' : 'Record Cash Out') + `
-        <form id="entryForm" class="space-y-3">
-          <input type="hidden" name="id" value="${esc(id || '')}">
-          <input type="hidden" name="type" value="${type}">
-          <label class="block text-sm font-semibold">Date<input name="date" type="date" required class="field mt-1" value="${v.date}"></label>
-          <label class="block text-sm font-semibold">Description<input name="note" class="field mt-1" maxlength="150" placeholder="Sale, purchase, expense..." value="${esc(v.note)}"></label>
-          <label class="block text-sm font-semibold">Total Transaction Amount<input id="totalAmount" name="total" type="number" step="0.01" min="0.01" required class="field mt-1" value="${v.total}"></label>
-          <label class="block text-sm font-semibold">Payment Status<select id="paymentStatus" name="status" class="field mt-1">${opts([['full', 'Full'], ['partial', 'Partial'], ['unpaid', 'Unpaid (Credit)']], v.status)}</select></label>
-          <div id="paidArea"><label class="block text-sm font-semibold">Amount ${type === 'in' ? 'Received' : 'Paid'} Now<input id="paidAmount" name="paid" type="number" step="0.01" min="0" class="field mt-1" value="${v.paid}"></label></div>
-          <div id="duePreview" class="bg-amber-50 text-amber-800 p-3 rounded-xl text-sm"></div>
-          <label class="block text-sm font-semibold">Account<select name="account" class="field mt-1">${opts(Object.entries(ACCOUNT_NAMES), v.account)}</select></label>
-          <label class="block text-sm font-semibold">Party / Contact<select id="entryParty" name="partyId" class="field mt-1"><option value="">No party</option>${opts(db.parties.map(p => [p.id, p.name + ' (' + p.kind + ')']), v.partyId)}</select></label>
-          <button class="btn bg-sky-600 text-white w-full" type="submit">Save Transaction</button>
+        <form id="entryForm" class="space-y-3" novalidate>
+          <input type="hidden" id="entry_id" value="${esc(id || '')}">
+          <input type="hidden" id="entry_type" value="${type}">
+          <div>
+            <label class="block text-sm font-semibold mb-1">Date</label>
+            <input id="entry_date" type="date" class="field" value="${v.date}">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Description / Notes</label>
+            <input id="entry_note" class="field" maxlength="150" placeholder="e.g. Daily Sales, Tea..." value="${esc(v.note)}">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Total Transaction Amount (₹)</label>
+            <input id="entry_total" type="number" step="any" placeholder="0.00" class="field" value="${v.total}">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Payment Status</label>
+            <select id="entry_status" class="field">${opts([['full', 'Full Received/Paid Now'], ['partial', 'Partial Payment'], ['unpaid', 'Unpaid (Full Credit)']], v.status)}</select>
+          </div>
+          <div id="paidArea">
+            <label class="block text-sm font-semibold mb-1">Amount ${type === 'in' ? 'Received' : 'Paid'} Now (₹)</label>
+            <input id="entry_paid" type="number" step="any" placeholder="0.00" class="field" value="${v.paid}">
+          </div>
+          <div id="duePreview" class="bg-amber-50 text-amber-800 p-3 rounded-xl text-sm font-semibold"></div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Account</label>
+            <select id="entry_account" class="field">${opts(Object.entries(ACCOUNT_NAMES), v.account)}</select>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Party / Contact (Optional)</label>
+            <select id="entry_party" class="field">
+              <option value="">-- No Linked Party --</option>
+              ${opts(db.parties.map(p => [p.id, p.name + ' (' + p.kind + ')']), v.partyId)}
+            </select>
+          </div>
+          <button class="btn bg-sky-600 text-white w-full mt-2 hover:bg-sky-700" type="submit">Save Transaction</button>
         </form>
       `);
 
       function update() {
-        const status = document.getElementById('paymentStatus').value;
-        const total = amount(document.getElementById('totalAmount').value);
-        const paidEl = document.getElementById('paidAmount');
-        document.getElementById('paidArea').style.display = status === 'full' || status === 'unpaid' ? 'none' : '';
-        if (status === 'full') paidEl.value = Number.isFinite(total) ? total : '';
-        if (status === 'unpaid') paidEl.value = 0;
-        const paid = amount(paidEl.value);
-        document.getElementById('duePreview').textContent = `Outstanding due: ${money(Number.isFinite(total) && Number.isFinite(paid) ? Math.max(0, total - paid) : 0)}`;
+        const status = document.getElementById('entry_status').value;
+        const total = parseNum(document.getElementById('entry_total').value);
+        const paidEl = document.getElementById('entry_paid');
+        const paidArea = document.getElementById('paidArea');
+
+        if (status === 'full') {
+          paidArea.style.display = 'none';
+          paidEl.value = total;
+        } else if (status === 'unpaid') {
+          paidArea.style.display = 'none';
+          paidEl.value = 0;
+        } else {
+          paidArea.style.display = 'block';
+        }
+
+        const paid = parseNum(paidEl.value);
+        const due = Math.max(0, total - paid);
+        document.getElementById('duePreview').textContent = `Remaining Credit / Due: ${money(due)}`;
       }
-      ['paymentStatus', 'totalAmount', 'paidAmount'].forEach(k => document.getElementById(k).addEventListener('input', update));
+
+      ['entry_status', 'entry_total', 'entry_paid'].forEach(k => {
+        const el = document.getElementById(k);
+        if (el) el.addEventListener('input', update);
+      });
       update();
     }
 
     function partyModal(id) {
       const p = db.parties.find(x => x.id === id) || { name: '', kind: 'Customer', phone: '' };
       showModal(header(id ? 'Edit Contact' : 'Add Contact') + `
-        <form id="partyForm" class="space-y-3">
-          <input name="id" type="hidden" value="${esc(id || '')}">
-          <label class="block text-sm font-semibold">Name<input name="name" class="field mt-1" required maxlength="100" value="${esc(p.name)}"></label>
-          <label class="block text-sm font-semibold">Type<select name="kind" class="field mt-1">${opts([['Customer', 'Customer'], ['Supplier', 'Supplier / Vendor']], p.kind)}</select></label>
-          <label class="block text-sm font-semibold">WhatsApp Phone<input name="phone" class="field mt-1" placeholder="919876543210" value="${esc(p.phone)}"></label>
-          <button class="btn bg-sky-600 text-white w-full">Save Contact</button>
+        <form id="partyForm" class="space-y-3" novalidate>
+          <input id="party_id" type="hidden" value="${esc(id || '')}">
+          <div>
+            <label class="block text-sm font-semibold mb-1">Name</label>
+            <input id="party_name" class="field" placeholder="Party / Person Name" value="${esc(p.name)}">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Type</label>
+            <select id="party_kind" class="field">${opts([['Customer', 'Customer'], ['Supplier', 'Supplier / Vendor']], p.kind)}</select>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">WhatsApp Phone (with Country Code)</label>
+            <input id="party_phone" class="field" placeholder="e.g. 919876543210" value="${esc(p.phone)}">
+          </div>
+          <button class="btn bg-sky-600 text-white w-full mt-2 hover:bg-sky-700" type="submit">Save Contact</button>
         </form>
       `);
     }
@@ -396,25 +451,43 @@
     function transferModal(deposit = false) {
       const b = accountBalances(date);
       showModal(header(deposit ? 'Deposit Cash to Bank' : 'Transfer Funds') + `
-        <form id="transferForm" class="space-y-3">
-          <input name="date" type="hidden" value="${date}">
-          <label class="block text-sm font-semibold">From Account<select name="from" class="field mt-1" ${deposit ? 'disabled' : ''}>${opts(Object.entries(ACCOUNT_NAMES), 'cash')}</select></label>
-          ${deposit ? '<input type="hidden" name="from" value="cash">' : ''}
-          <label class="block text-sm font-semibold">To Account<select name="to" class="field mt-1" ${deposit ? 'disabled' : ''}>${opts(Object.entries(ACCOUNT_NAMES), 'bank')}</select></label>
-          ${deposit ? '<input type="hidden" name="to" value="bank">' : ''}
-          <label class="block text-sm font-semibold">Amount<input name="amount" type="number" step="0.01" min="0.01" required class="field mt-1"></label>
-          <label class="block text-sm font-semibold">Note<input name="note" class="field mt-1" maxlength="150" placeholder="Optional"></label>
-          <p class="text-xs text-slate-500">Available cash: ${money(b.cash)}</p>
-          <button class="btn bg-sky-600 text-white w-full">Confirm Transfer</button>
+        <form id="transferForm" class="space-y-3" novalidate>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Date</label>
+            <input id="tr_date" type="date" class="field" value="${date}">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">From Account</label>
+            <select id="tr_from" class="field" ${deposit ? 'disabled' : ''}>${opts(Object.entries(ACCOUNT_NAMES), 'cash')}</select>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">To Account</label>
+            <select id="tr_to" class="field" ${deposit ? 'disabled' : ''}>${opts(Object.entries(ACCOUNT_NAMES), 'bank')}</select>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Amount (₹)</label>
+            <input id="tr_amount" type="number" step="any" placeholder="0.00" class="field">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Note</label>
+            <input id="tr_note" class="field" placeholder="Optional remark">
+          </div>
+          <p class="text-xs text-slate-500">Available cash drawer balance: ${money(b.cash)}</p>
+          <button class="btn bg-sky-600 text-white w-full mt-2 hover:bg-sky-700" type="submit">Confirm Transfer</button>
         </form>
       `);
     }
 
     function openingModal() {
       showModal(header('Initial Account Balances') + `
-        <form id="openingForm" class="space-y-3">
-          ${Object.entries(ACCOUNT_NAMES).map(([k, n]) => `<label class="block text-sm font-semibold">${n}<input name="${k}" type="number" step="0.01" min="0" required class="field mt-1" value="${db.opening[k] || 0}"></label>`).join('')}
-          <button class="btn bg-sky-600 text-white w-full">Save Opening Balances</button>
+        <form id="openingForm" class="space-y-3" novalidate>
+          ${Object.entries(ACCOUNT_NAMES).map(([k, n]) => `
+            <div>
+              <label class="block text-sm font-semibold mb-1">${n}</label>
+              <input id="op_${k}" type="number" step="any" class="field" value="${db.opening[k] || 0}">
+            </div>
+          `).join('')}
+          <button class="btn bg-sky-600 text-white w-full mt-2 hover:bg-sky-700" type="submit">Save Balances</button>
         </form>
       `);
     }
@@ -433,12 +506,17 @@
       const p = db.parties.find(x => x.id === id), b = partyBalance(id);
       if (!p || Math.abs(b) < 0.005) return;
       showModal(header('Settle ' + esc(p.name)) + `
-        <form id="settleForm" class="space-y-3">
-          <input type="hidden" name="partyId" value="${id}">
-          <input type="hidden" name="date" value="${date}">
-          <label class="block text-sm font-semibold">Amount<input type="number" name="amount" step="0.01" min="0.01" max="${Math.abs(b).toFixed(2)}" value="${Math.abs(b).toFixed(2)}" class="field mt-1" required></label>
-          <label class="block text-sm font-semibold">Account<select name="account" class="field mt-1">${opts(Object.entries(ACCOUNT_NAMES), 'cash')}</select></label>
-          <button class="btn bg-sky-600 text-white w-full">Record Settlement</button>
+        <form id="settleForm" class="space-y-3" novalidate>
+          <input id="st_partyId" type="hidden" value="${id}">
+          <div>
+            <label class="block text-sm font-semibold mb-1">Amount (₹)</label>
+            <input id="st_amount" type="number" step="any" value="${Math.abs(b).toFixed(2)}" class="field">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Account</label>
+            <select id="st_account" class="field">${opts(Object.entries(ACCOUNT_NAMES), 'cash')}</select>
+          </div>
+          <button class="btn bg-sky-600 text-white w-full mt-2 hover:bg-sky-700" type="submit">Record Settlement</button>
         </form>
       `);
     }
@@ -467,6 +545,7 @@
       window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank', 'noopener,noreferrer');
     }
 
+    // Global Click Event Listener
     document.addEventListener('click', e => {
       const b = e.target.closest('[data-action]');
       if (!b) return;
@@ -498,50 +577,97 @@
       if (e.target.id === 'dateInput') { date = e.target.value || today(); render(); }
     });
 
+    // Form Submit Handlers
     document.addEventListener('submit', e => {
       e.preventDefault();
       const f = e.target;
-      const v = Object.fromEntries(new FormData(f).entries());
 
       if (f.id === 'entryForm') {
-        const total = amount(v.total);
-        const paid = v.status === 'full' ? total : v.status === 'unpaid' ? 0 : amount(v.paid);
-        if (!Number.isFinite(total) || total <= 0) { alert('Invalid total amount'); return; }
-        
-        const old = db.entries.find(x => x.id === v.id);
-        const obj = {
-          id: old?.id || uid(),
-          created: old?.created || Date.now(),
-          type: v.type,
-          date: v.date,
-          account: v.account,
-          status: v.status,
+        const id = document.getElementById('entry_id').value;
+        const type = document.getElementById('entry_type').value;
+        const entryDate = document.getElementById('entry_date').value || date;
+        const note = document.getElementById('entry_note').value.trim();
+        const total = parseNum(document.getElementById('entry_total').value);
+        const status = document.getElementById('entry_status').value;
+        const account = document.getElementById('entry_account').value;
+        const partyId = document.getElementById('entry_party').value;
+
+        let paid = 0;
+        if (status === 'full') paid = total;
+        else if (status === 'unpaid') paid = 0;
+        else paid = parseNum(document.getElementById('entry_paid').value);
+
+        if (total <= 0) {
+          alert('Please enter a valid total amount.');
+          return;
+        }
+
+        if ((status === 'partial' || status === 'unpaid') && !partyId) {
+          alert('Please select a party contact to attach the unpaid balance.');
+          return;
+        }
+
+        const oldIndex = db.entries.findIndex(x => x.id === id);
+        const entryObj = {
+          id: id || uid(),
+          created: oldIndex >= 0 ? db.entries[oldIndex].created : Date.now(),
+          type,
+          date: entryDate,
+          account,
+          status,
           total,
           paid,
-          partyId: v.partyId || '',
-          note: (v.note || '').trim()
+          partyId,
+          note
         };
-        if (old) Object.assign(old, obj); else db.entries.push(obj);
+
+        if (oldIndex >= 0) db.entries[oldIndex] = entryObj;
+        else db.entries.unshift(entryObj);
       } else if (f.id === 'partyForm') {
-        const name = (v.name || '').trim();
-        if (!name) return;
-        const old = db.parties.find(x => x.id === v.id);
-        const obj = { id: old?.id || uid(), name, kind: v.kind, phone: (v.phone || '').trim() };
-        if (old) Object.assign(old, obj); else db.parties.push(obj);
+        const id = document.getElementById('party_id').value;
+        const name = document.getElementById('party_name').value.trim();
+        const kind = document.getElementById('party_kind').value;
+        const phone = document.getElementById('party_phone').value.trim();
+
+        if (!name) {
+          alert('Please enter a party name.');
+          return;
+        }
+
+        const oldIndex = db.parties.findIndex(x => x.id === id);
+        const partyObj = { id: id || uid(), name, kind, phone };
+
+        if (oldIndex >= 0) db.parties[oldIndex] = partyObj;
+        else db.parties.push(partyObj);
       } else if (f.id === 'transferForm') {
-        const n = amount(v.amount);
-        if (!Number.isFinite(n) || n <= 0 || v.from === v.to) return;
-        db.transfers.push({ id: uid(), created: Date.now(), date: v.date, from: v.from, to: v.to, amount: n, note: (v.note || '').trim() });
+        const trDate = document.getElementById('tr_date').value || date;
+        const from = document.getElementById('tr_from').value;
+        const to = document.getElementById('tr_to').value;
+        const amount = parseNum(document.getElementById('tr_amount').value);
+        const note = document.getElementById('tr_note').value.trim();
+
+        if (amount <= 0 || from === to) {
+          alert('Please enter a valid transfer amount between two different accounts.');
+          return;
+        }
+
+        db.transfers.unshift({ id: uid(), created: Date.now(), date: trDate, from, to, amount, note });
       } else if (f.id === 'openingForm') {
-        for (const k of Object.keys(ACCOUNT_NAMES)) db.opening[k] = amount(v[k]) || 0;
+        for (const k of Object.keys(ACCOUNT_NAMES)) {
+          const el = document.getElementById(`op_${k}`);
+          if (el) db.opening[k] = parseNum(el.value);
+        }
       } else if (f.id === 'settleForm') {
-        const n = amount(v.amount);
-        const b = partyBalance(v.partyId);
-        if (n > 0) {
-          db.entries.push({
-            id: uid(), created: Date.now(), date: v.date,
-            type: b > 0 ? 'in' : 'out', account: v.account,
-            status: 'full', total: n, paid: n, partyId: v.partyId, note: 'Due settlement'
+        const partyId = document.getElementById('st_partyId').value;
+        const amount = parseNum(document.getElementById('st_amount').value);
+        const account = document.getElementById('st_account').value;
+        const b = partyBalance(partyId);
+
+        if (amount > 0) {
+          db.entries.unshift({
+            id: uid(), created: Date.now(), date,
+            type: b > 0 ? 'in' : 'out', account,
+            status: 'full', total: amount, paid: amount, partyId, note: 'Due settlement'
           });
         }
       }
@@ -551,6 +677,7 @@
       render();
     });
 
+    // Tab Navigation
     document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => { tab = b.dataset.tab; search = ''; render(); }));
     document.getElementById('addPartyTop').onclick = () => partyModal();
     document.getElementById('backupBtn').onclick = () => { tab = 'reports'; render(); };
