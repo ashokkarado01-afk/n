@@ -59,22 +59,7 @@
 
   <script>
     'use strict';
-    // 1. Firebase Configuration Keys
-    const firebaseConfig = {
-      apiKey: "AIzaSyCchPfwpN1A2P7pvIE1GPsutZw2ahj-37I",
-      authDomain: "mycashbook-74be5.firebaseapp.com",
-      projectId: "mycashbook-74be5",
-      storageBucket: "mycashbook-74be5.firebasestorage.app",
-      messagingSenderId: "870100611895",
-      appId: "1:870100611895:web:763e05ac88cf0d915620b2",
-      measurementId: "G-S9N5CYLCT3"
-    };
-
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const dbCloud = firebase.firestore();
-
+    const KEY = 'skyledger_v5';
     const ACCOUNT_NAMES = { cash: 'Cash Drawer', bank: 'Bank Account', upi: 'UPI', card: 'Card' };
     
     const initial = () => ({
@@ -85,51 +70,15 @@
       transfers: []
     });
 
-    let db = initial();
-    let currentUserId = null;
+    let db = load();
     let tab = 'register';
     let date = today();
     let search = '';
     let partySearch = '';
 
-    // Automatically sign in anonymously to create a cloud session
-    auth.signInAnonymously().then(userCredential => {
-      currentUserId = userCredential.user.uid;
-      loadFromCloud();
-    }).catch(error => {
-      console.error("Firebase auth error:", error);
-      // Fallback to local storage if offline or auth error occurs
-      db = loadLocal();
-      render();
-    });
-
-    function loadFromCloud() {
-      if (!currentUserId) return;
-      dbCloud.collection('users').doc(currentUserId).get().then(doc => {
-        if (doc.exists) {
-          const parsed = doc.data();
-          db = {
-            version: 1,
-            opening: parsed.opening || { cash: 0, bank: 0, upi: 0, card: 0 },
-            parties: Array.isArray(parsed.parties) ? parsed.parties : [],
-            entries: Array.isArray(parsed.entries) ? parsed.entries : [],
-            transfers: Array.isArray(parsed.transfers) ? parsed.transfers : []
-          };
-        } else {
-          db = loadLocal() || initial();
-          save();
-        }
-        render();
-      }).catch(err => {
-        console.error("Error loading cloud data:", err);
-        db = loadLocal();
-        render();
-      });
-    }
-
-    function loadLocal() {
+    function load() {
       try {
-        const raw = localStorage.getItem('skyledger_v5');
+        const raw = localStorage.getItem(KEY);
         if (!raw) return initial();
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object') {
@@ -142,24 +91,19 @@
           };
         }
       } catch (e) {
-        console.error('Error loading local data:', e);
+        console.error('Error loading data:', e);
       }
       return initial();
     }
 
     function save() {
       try {
-        localStorage.setItem('skyledger_v5', JSON.stringify(db));
-      } catch(e) {}
-
-      if (currentUserId) {
-        dbCloud.collection('users').doc(currentUserId).set(db).then(() => {
-          console.log("Data synced to Firebase successfully.");
-        }).catch(e => {
-          console.error('Cloud save error:', e);
-        });
+        localStorage.setItem(KEY, JSON.stringify(db));
+        return true;
+      } catch (e) {
+        alert('Storage error: Unable to save to browser local storage.');
+        return false;
       }
-      return true;
     }
 
     function today() {
