@@ -1,49 +1,562 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>SkyLedger • Daily Business Register</title><script src="https://cdn.tailwindcss.com"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"><style>body{font-family:Inter,ui-sans-serif,system-ui,sans-serif;background:#eaf2fa}.phone{width:410px;max-width:100%;height:min(860px,calc(100dvh - 40px));border:9px solid #152c46;border-radius:42px;box-shadow:0 28px 75px #18365335;overflow:hidden}.full{width:100%;height:100dvh;border:0;border-radius:0;box-shadow:none}.shell{height:100%;display:flex;flex-direction:column;background:#f8fbff}.scroll{overflow-y:auto;min-height:0;flex:1;scrollbar-width:thin}.nav{padding-bottom:max(12px,env(safe-area-inset-bottom))}.field{width:100%;border:1px solid #dbe6f0;border-radius:12px;padding:11px 12px;background:white;outline:none}.field:focus{border-color:#0284c7;box-shadow:0 0 0 3px #0284c719}.btn{border-radius:12px;padding:11px 14px;font-weight:650}.card{background:white;border:1px solid #e4edf5;border-radius:18px;box-shadow:0 3px 15px #164e6310}.small{font-size:11px;letter-spacing:.04em;text-transform:uppercase;font-weight:700;color:#64748b}.modal-backdrop{position:fixed;inset:0;background:#0f172a99;display:flex;align-items:center;justify-content:center;z-index:30;padding:12px}.modal{width:min(440px,100%);max-height:92dvh;overflow-y:auto;border-radius:22px;background:#fff;padding:20px}.full .modal{width:min(520px,100%)}button:disabled{opacity:.45;cursor:not-allowed}@media(max-width:500px){body{background:#f8fbff}.phone{width:100%;height:100dvh;border:0;border-radius:0;box-shadow:none}#frameBtn{display:none}}</style></head><body class="text-slate-800"><div class="min-h-dvh flex flex-col items-center justify-center md:p-5"><button id="frameBtn" class="mb-3 rounded-full bg-white px-5 py-2 text-sm font-semibold text-sky-700 shadow"><i class="fa-solid fa-mobile-screen-button mr-2"></i>Toggle Full Screen</button><div id="device" class="phone"><div class="shell"><header class="bg-white border-b border-slate-100 px-5 pt-5 pb-3 flex items-center justify-between"><div><div class="text-xs tracking-widest font-bold text-sky-600">SKYLEDGER</div><h1 id="pageTitle" class="font-extrabold text-xl">Daily Register</h1></div><div class="flex gap-2"><button id="backupBtn" title="Backup and import" class="w-10 h-10 rounded-xl bg-sky-50 text-sky-700"><i class="fa-solid fa-cloud-arrow-down"></i></button><button id="addPartyTop" title="Add party" class="w-10 h-10 rounded-xl bg-sky-600 text-white"><i class="fa-solid fa-user-plus"></i></button></div></header><main id="main" class="scroll px-4 py-4"></main><nav class="nav bg-white border-t border-slate-100 flex justify-around pt-3"><button data-tab="register" class="tab flex flex-col items-center gap-1 text-xs font-semibold"><i class="fa-solid fa-book text-lg"></i>Register</button><button data-tab="parties" class="tab flex flex-col items-center gap-1 text-xs font-semibold"><i class="fa-solid fa-address-book text-lg"></i>Khatabook</button><button data-tab="reports" class="tab flex flex-col items-center gap-1 text-xs font-semibold"><i class="fa-solid fa-chart-pie text-lg"></i>Reports</button></nav></div></div></div><div id="modalRoot"></div><input type="file" id="importFile" accept="application/json,.json" class="hidden"><script>
-'use strict';
-const KEY='skyledger-v1';const ACCOUNT_NAMES={cash:'Cash Drawer',bank:'Bank Account',upi:'UPI',card:'Card'};
-const initial=()=>({version:1,opening:{cash:0,bank:0,upi:0,card:0},parties:[],entries:[],transfers:[]});
-let db=load(),tab='register',date=today(),search='',partySearch='';
-function load(){try{const v=JSON.parse(localStorage.getItem(KEY));if(v&&v.version===1&&Array.isArray(v.entries)&&Array.isArray(v.parties)&&Array.isArray(v.transfers)&&v.opening)return v}catch(e){}return initial()}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(db));return true}catch(e){alert('Could not save: browser storage may be full or disabled. Export a backup.');return false}}
-function today(){const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
-function shift(d,n){const x=new Date(d+'T12:00:00');x.setDate(x.getDate()+n);return [x.getFullYear(),String(x.getMonth()+1).padStart(2,'0'),String(x.getDate()).padStart(2,'0')].join('-')}
-function money(n){return '₹'+Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}
-function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function uid(){return crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2)}
-function amount(v){const n=Number(v);return Number.isFinite(n)&&n>=0?Math.round(n*100)/100:NaN}
-function signed(e){return e.type==='in'?e.paid:-e.paid}
-function accountBalances(until){const b={...db.opening};for(const e of db.entries){if(!until||e.date<=until)b[e.account]=(b[e.account]||0)+signed(e)}for(const t of db.transfers){if(!until||t.date<=until){b[t.from]-=t.amount;b[t.to]+=t.amount}}return b}
-function cashBefore(d){const prev=db.entries.filter(e=>e.date<d&&e.account==='cash').reduce((s,e)=>s+signed(e),0);const move=db.transfers.filter(t=>t.date<d).reduce((s,t)=>s+(t.to==='cash'?t.amount:0)-(t.from==='cash'?t.amount:0),0);return (db.opening.cash||0)+prev+move}
-function cashDay(d){const es=db.entries.filter(e=>e.date===d&&e.account==='cash');const incoming=es.filter(e=>e.type==='in').reduce((s,e)=>s+e.paid,0),outgoing=es.filter(e=>e.type==='out').reduce((s,e)=>s+e.paid,0);const transferNet=db.transfers.filter(t=>t.date===d).reduce((s,t)=>s+(t.to==='cash'?t.amount:0)-(t.from==='cash'?t.amount:0),0);return {incoming,outgoing,transferNet,opening:cashBefore(d),closing:cashBefore(d)+incoming-outgoing+transferNet}}
-function partyBalance(id){return db.entries.filter(e=>e.partyId===id).reduce((s,e)=>s+(e.note==='Due settlement'?(e.type==='in'?-e.paid:e.paid):(e.type==='in'?e.total-e.paid:-(e.total-e.paid))),0)}
-function partyName(id){return db.parties.find(p=>p.id===id)?.name||'Unlinked'}
-function render(){document.getElementById('pageTitle').textContent={register:'Daily Register',parties:'Party Khatabook',reports:'Business Reports'}[tab];document.querySelectorAll('.tab').forEach(x=>x.className='tab flex flex-col items-center gap-1 text-xs font-semibold '+(x.dataset.tab===tab?'text-sky-600':'text-slate-400'));document.getElementById('main').innerHTML=tab==='register'?renderRegister():tab==='parties'?renderParties():renderReports()}
-function renderRegister(){const c=cashDay(date),balances=accountBalances(date);const entries=db.entries.filter(e=>e.date===date&&[e.note,partyName(e.partyId),e.type].join(' ').toLowerCase().includes(search.toLowerCase())).sort((a,b)=>b.created-a.created);const transfers=db.transfers.filter(t=>t.date===date).map(t=>({kind:'transfer',...t}));const rows=[...entries.map(e=>({kind:'entry',...e})),...(!search?transfers:[])].sort((a,b)=>b.created-a.created);return `<div class="card p-3 mb-4 flex items-center gap-2"><button data-action="prev" class="px-2 text-sky-600"><i class="fa-solid fa-chevron-left"></i></button><input id="dateInput" type="date" value="${date}" class="field text-sm flex-1 min-w-0"><button data-action="next" class="px-2 text-sky-600"><i class="fa-solid fa-chevron-right"></i></button><button data-action="today" class="text-xs bg-sky-100 text-sky-700 rounded-lg px-2 py-3 font-bold">Today</button></div><div class="rounded-2xl bg-gradient-to-br from-sky-700 to-sky-500 text-white p-5 shadow-lg shadow-sky-200"><div class="text-sm opacity-85">Closing Cash in Hand</div><div class="text-3xl font-extrabold mt-1">${money(c.closing)}</div><div class="grid grid-cols-3 gap-2 mt-5 text-xs"><div><div class="opacity-75">Opening</div><strong>${money(c.opening)}</strong></div><div><div class="opacity-75">Cash In</div><strong>${money(c.incoming)}</strong></div><div><div class="opacity-75">Cash Out</div><strong>${money(c.outgoing)}</strong></div></div><div class="text-xs mt-3 opacity-90">Internal transfer adjustment: ${money(c.transferNet)}</div><button data-action="deposit" class="mt-4 w-full rounded-xl bg-white text-sky-700 font-bold py-3"><i class="fa-solid fa-building-columns mr-2"></i>Deposit Cash to Bank</button></div><div class="grid grid-cols-2 gap-3 mt-4"><button data-action="add-in" class="btn bg-emerald-600 text-white"><i class="fa-solid fa-arrow-down mr-2"></i>Cash In</button><button data-action="add-out" class="btn bg-rose-600 text-white"><i class="fa-solid fa-arrow-up mr-2"></i>Cash Out</button></div><div class="flex justify-between items-center mt-6 mb-3"><h2 class="font-bold">Account Balances</h2><button data-action="transfer" class="text-sky-600 text-sm font-bold">Transfer <i class="fa-solid fa-right-left"></i></button></div><div class="grid grid-cols-2 gap-3">${Object.entries(ACCOUNT_NAMES).map(([k,v])=>`<div class="card p-3"><div class="small">${v}</div><div class="font-extrabold mt-1 text-base">${money(balances[k])}</div></div>`).join('')}</div><div class="flex items-center justify-between mt-6 mb-3"><h2 class="font-bold">Daily Activity</h2><span class="text-xs text-slate-500">${rows.length} records</span></div><input id="entrySearch" class="field mb-3" placeholder="Search transactions" value="${esc(search)}">${rows.length?rows.map(r=>r.kind==='transfer'?`<div class="card p-3 mb-2 flex gap-3 items-center"><div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 grid place-items-center"><i class="fa-solid fa-right-left"></i></div><div class="flex-1 min-w-0"><div class="font-bold text-sm">${esc(ACCOUNT_NAMES[r.from])} → ${esc(ACCOUNT_NAMES[r.to])}</div><div class="text-xs text-slate-500">Internal transfer • ${esc(r.note||'')}</div></div><div class="text-right"><b>${money(r.amount)}</b><button data-action="delete-transfer" data-id="${r.id}" class="block text-xs text-rose-500 ml-auto">Delete</button></div></div>`:`<div class="card p-3 mb-2 flex gap-3 items-center"><div class="w-10 h-10 rounded-xl ${r.type==='in'?'bg-emerald-50 text-emerald-600':'bg-rose-50 text-rose-600'} grid place-items-center"><i class="fa-solid fa-${r.type==='in'?'arrow-down':'arrow-up'}"></i></div><div class="flex-1 min-w-0"><div class="font-bold text-sm truncate">${esc(r.note||partyName(r.partyId))}</div><div class="text-xs text-slate-500">${esc(ACCOUNT_NAMES[r.account])} • ${esc(r.status)}${r.partyId?' • '+esc(partyName(r.partyId)):''}</div>${r.total>r.paid?`<div class="text-xs text-amber-600">Due ${money(r.total-r.paid)}</div>`:''}</div><div class="text-right"><div class="font-extrabold ${r.type==='in'?'text-emerald-600':'text-rose-600'}">${r.type==='in'?'+':'−'}${money(r.paid)}</div><div class="flex gap-2 justify-end text-xs mt-1"><button data-action="edit-entry" data-id="${r.id}" class="text-sky-600">Edit</button><button data-action="delete-entry" data-id="${r.id}" class="text-rose-500">Delete</button></div></div></div>`).join(''):`<div class="card p-8 text-center text-slate-400">No activity for this date.</div>`}`}
-function renderParties(){const ps=db.parties.filter(p=>[p.name,p.phone,p.kind].join(' ').toLowerCase().includes(partySearch.toLowerCase())).sort((a,b)=>a.name.localeCompare(b.name));const get=db.parties.reduce((s,p)=>s+Math.max(0,partyBalance(p.id)),0),give=db.parties.reduce((s,p)=>s+Math.max(0,-partyBalance(p.id)),0);return `<div class="grid grid-cols-2 gap-3 mb-4"><div class="card p-4"><div class="small">You Will Get</div><div class="font-extrabold text-emerald-600 text-xl mt-2">${money(get)}</div></div><div class="card p-4"><div class="small">You Will Give</div><div class="font-extrabold text-rose-600 text-xl mt-2">${money(give)}</div></div></div><button data-action="add-party" class="btn bg-sky-600 text-white w-full mb-4"><i class="fa-solid fa-user-plus mr-2"></i>Add Customer / Supplier</button><input id="partySearch" class="field mb-4" placeholder="Search name or phone" value="${esc(partySearch)}">${ps.length?ps.map(p=>{const b=partyBalance(p.id);return `<div class="card p-4 mb-3"><div class="flex justify-between gap-3"><div class="min-w-0"><div class="font-bold truncate">${esc(p.name)}</div><div class="text-xs text-slate-500">${esc(p.kind)}${p.phone?' • '+esc(p.phone):''}</div></div><div class="text-right"><div class="font-bold ${b>0?'text-emerald-600':b<0?'text-rose-600':'text-slate-500'}">${money(Math.abs(b))}</div><div class="text-xs">${b>0?'You Will Get':b<0?'You Will Give':'Settled'}</div></div></div><div class="flex flex-wrap gap-3 border-t border-slate-100 pt-3 mt-3 text-xs font-bold"><button data-action="party-detail" data-id="${p.id}" class="text-sky-600">Ledger</button><button data-action="settle" data-id="${p.id}" class="text-emerald-600" ${Math.abs(b)<.005?'disabled':''}>Settle Due</button><button data-action="remind" data-id="${p.id}" class="text-green-600" ${!p.phone||Math.abs(b)<.005?'disabled':''}><i class="fa-brands fa-whatsapp"></i> WhatsApp</button><button data-action="edit-party" data-id="${p.id}" class="text-slate-500">Edit</button><button data-action="delete-party" data-id="${p.id}" class="text-rose-500">Delete</button></div></div>`}).join(''):'<div class="card p-8 text-center text-slate-400">No contacts yet.</div>'}`}
-function renderReports(){const totals={in:0,out:0,dueGet:0,dueGive:0};db.entries.forEach(e=>totals[e.type]+=e.paid);db.parties.forEach(p=>{const b=partyBalance(p.id);totals.dueGet+=Math.max(0,b);totals.dueGive+=Math.max(0,-b)});const b=accountBalances();return `<div class="card p-5"><div class="small mb-2">All-time received / paid</div><div class="grid grid-cols-2 gap-4"><div><div class="text-sm text-slate-500">Money In</div><div class="font-extrabold text-emerald-600 text-xl">${money(totals.in)}</div></div><div><div class="text-sm text-slate-500">Money Out</div><div class="font-extrabold text-rose-600 text-xl">${money(totals.out)}</div></div></div><div class="border-t mt-4 pt-3 flex justify-between font-bold"><span>Net Cash Flow</span><span>${money(totals.in-totals.out)}</span></div></div><div class="card p-5 mt-4"><div class="font-bold mb-3">Current Accounts</div>${Object.entries(ACCOUNT_NAMES).map(([k,n])=>`<div class="flex justify-between py-2 border-b last:border-0 text-sm"><span>${n}</span><b>${money(b[k])}</b></div>`).join('')}<div class="flex justify-between pt-3 font-bold text-sky-700"><span>Total Funds</span><span>${money(Object.values(b).reduce((a,v)=>a+v,0))}</span></div></div><div class="card p-5 mt-4"><div class="font-bold mb-3">Outstanding Credit</div><div class="flex justify-between text-sm mb-2"><span>You Will Get</span><b class="text-emerald-600">${money(totals.dueGet)}</b></div><div class="flex justify-between text-sm"><span>You Will Give</span><b class="text-rose-600">${money(totals.dueGive)}</b></div></div><div class="card p-5 mt-4"><h2 class="font-bold mb-2">Data & Statements</h2><p class="text-xs text-slate-500 mb-3">CSV includes all entries and internal transfers. JSON includes all data for restoring a backup.</p><div class="grid grid-cols-2 gap-2"><button data-action="csv" class="btn bg-sky-50 text-sky-700 text-sm">Export CSV</button><button data-action="backup" class="btn bg-sky-600 text-white text-sm">JSON Backup</button><button data-action="import" class="btn bg-slate-100 text-slate-700 text-sm">Import JSON</button><button data-action="opening" class="btn bg-slate-100 text-slate-700 text-sm">Opening Funds</button></div></div>`}
-function showModal(html){document.getElementById('modalRoot').innerHTML=`<div class="modal-backdrop" id="overlay"><div class="modal" role="dialog" aria-modal="true">${html}</div></div>`;document.getElementById('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeModal()})}
-function closeModal(){document.getElementById('modalRoot').innerHTML=''}
-function header(t){return `<div class="flex justify-between items-center mb-4"><h2 class="text-xl font-extrabold">${t}</h2><button data-action="close" class="w-9 h-9 bg-slate-100 rounded-xl"><i class="fa-solid fa-xmark"></i></button></div>`}
-function opts(items,selected){return items.map(([v,t])=>`<option value="${esc(v)}" ${v===selected?'selected':''}>${esc(t)}</option>`).join('')}
-function entryModal(type,id){const e=db.entries.find(x=>x.id===id),v=e||{type,date,account:'cash',status:'full',total:'',paid:'',partyId:'',note:''};showModal(header(e?'Edit Transaction':type==='in'?'Record Cash In':'Record Cash Out')+`<form id="entryForm" class="space-y-3"><input type="hidden" name="id" value="${esc(id||'')}"><input type="hidden" name="type" value="${type}"><label class="block text-sm font-semibold">Date<input name="date" type="date" required class="field mt-1" value="${v.date}"></label><label class="block text-sm font-semibold">Description<input name="note" class="field mt-1" maxlength="150" placeholder="Sale, purchase, expense..." value="${esc(v.note)}"></label><label class="block text-sm font-semibold">Total Transaction Amount<input id="totalAmount" name="total" type="number" step="0.01" min="0.01" required class="field mt-1" value="${v.total}"></label><label class="block text-sm font-semibold">Payment Status<select id="paymentStatus" name="status" class="field mt-1">${opts([['full','Full'],['partial','Partial'],['unpaid','Unpaid (Credit)']],v.status)}</select></label><div id="paidArea"><label class="block text-sm font-semibold">Amount ${type==='in'?'Received':'Paid'} Now<input id="paidAmount" name="paid" type="number" step="0.01" min="0" class="field mt-1" value="${v.paid}"></label></div><div id="duePreview" class="bg-amber-50 text-amber-800 p-3 rounded-xl text-sm"></div><label class="block text-sm font-semibold">Account<select name="account" class="field mt-1">${opts(Object.entries(ACCOUNT_NAMES),v.account)}</select></label><label class="block text-sm font-semibold">Party / Contact<select id="entryParty" name="partyId" class="field mt-1"><option value="">No party</option>${opts(db.parties.map(p=>[p.id,p.name+' ('+p.kind+')']),v.partyId)}</select></label><button class="btn bg-sky-600 text-white w-full" type="submit">Save Transaction</button></form>`);function update(){const status=document.getElementById('paymentStatus').value,total=amount(document.getElementById('totalAmount').value),paidEl=document.getElementById('paidAmount');document.getElementById('paidArea').style.display=status==='full'||status==='unpaid'?'none':'';if(status==='full')paidEl.value=Number.isFinite(total)?total:'';if(status==='unpaid')paidEl.value=0;const paid=amount(paidEl.value);document.getElementById('duePreview').textContent=`Outstanding due: ${money(Number.isFinite(total)&&Number.isFinite(paid)?Math.max(0,total-paid):0)}${status!=='full'?' • Party required':''}`}['paymentStatus','totalAmount','paidAmount'].forEach(k=>document.getElementById(k).addEventListener('input',update));update()}
-function partyModal(id){const p=db.parties.find(x=>x.id===id)||{name:'',kind:'Customer',phone:''};showModal(header(id?'Edit Contact':'Add Contact')+`<form id="partyForm" class="space-y-3"><input name="id" type="hidden" value="${esc(id||'')}"><label class="block text-sm font-semibold">Name<input name="name" class="field mt-1" required maxlength="100" value="${esc(p.name)}"></label><label class="block text-sm font-semibold">Type<select name="kind" class="field mt-1">${opts([['Customer','Customer'],['Supplier','Supplier / Vendor']],p.kind)}</select></label><label class="block text-sm font-semibold">WhatsApp Phone (country code included)<input name="phone" class="field mt-1" placeholder="919876543210" value="${esc(p.phone)}"></label><button class="btn bg-sky-600 text-white w-full">Save Contact</button></form>`)}
-function transferModal(deposit=false){const b=accountBalances(date);showModal(header(deposit?'Deposit Cash to Bank':'Transfer Funds')+`<form id="transferForm" class="space-y-3"><label class="block text-sm font-semibold">Date<input name="date" type="date" class="field mt-1" value="${date}" required></label><label class="block text-sm font-semibold">From Account<select name="from" class="field mt-1" ${deposit?'disabled':''}>${opts(Object.entries(ACCOUNT_NAMES),deposit?'cash':'cash')}</select></label>${deposit?'<input type="hidden" name="from" value="cash">':''}<label class="block text-sm font-semibold">To Account<select name="to" class="field mt-1" ${deposit?'disabled':''}>${opts(Object.entries(ACCOUNT_NAMES),deposit?'bank':'bank')}</select></label>${deposit?'<input type="hidden" name="to" value="bank">':''}<label class="block text-sm font-semibold">Amount<input name="amount" type="number" step="0.01" min="0.01" required class="field mt-1"></label><label class="block text-sm font-semibold">Note<input name="note" class="field mt-1" maxlength="150" placeholder="Optional"></label><p class="text-xs text-slate-500">Available cash on selected date: ${money(b.cash)}. Transfers do not count as sales or expenses.</p><button class="btn bg-sky-600 text-white w-full">Confirm Transfer</button></form>`)}
-function openingModal(){showModal(header('Initial Account Balances')+`<p class="text-xs text-slate-500 mb-4">Set the account balances before your first recorded transaction. These values are the baseline for all dates.</p><form id="openingForm" class="space-y-3">${Object.entries(ACCOUNT_NAMES).map(([k,n])=>`<label class="block text-sm font-semibold">${n}<input name="${k}" type="number" step="0.01" min="0" required class="field mt-1" value="${db.opening[k]||0}"></label>`).join('')}<button class="btn bg-sky-600 text-white w-full">Save Opening Balances</button></form>`)}
-function detailModal(id){const p=db.parties.find(x=>x.id===id);if(!p)return;const es=db.entries.filter(e=>e.partyId===id).sort((a,b)=>b.date.localeCompare(a.date)||b.created-a.created);showModal(header(esc(p.name)+' Ledger')+`<p class="font-bold mb-3">${partyBalance(id)>=0?'You Will Get':'You Will Give'}: ${money(Math.abs(partyBalance(id)))}</p>${es.length?es.map(e=>`<div class="border-b py-3 text-sm"><div class="flex justify-between"><b>${esc(e.note||'Transaction')}</b><b>${e.type==='in'?'+':'−'}${money(e.total-e.paid)} due</b></div><div class="text-xs text-slate-500">${e.date} • Total ${money(e.total)} • Paid ${money(e.paid)}</div></div>`).join(''):'<p class="text-slate-500">No ledger entries.</p>'}`)}
-function settleModal(id){const p=db.parties.find(x=>x.id===id),b=partyBalance(id);if(!p||Math.abs(b)<.005)return;showModal(header('Settle '+esc(p.name))+`<p class="text-sm mb-3">${b>0?'Receive from customer':'Pay to supplier'} • Outstanding ${money(Math.abs(b))}</p><form id="settleForm" class="space-y-3"><input type="hidden" name="partyId" value="${id}"><label class="block text-sm font-semibold">Date<input type="date" name="date" value="${date}" class="field mt-1" required></label><label class="block text-sm font-semibold">Amount<input type="number" name="amount" step="0.01" min="0.01" max="${Math.abs(b).toFixed(2)}" value="${Math.abs(b).toFixed(2)}" class="field mt-1" required></label><label class="block text-sm font-semibold">Account<select name="account" class="field mt-1">${opts(Object.entries(ACCOUNT_NAMES),'cash')}</select></label><button class="btn bg-sky-600 text-white w-full">Record Settlement</button></form>`)}
-function download(name,content,mime){const url=URL.createObjectURL(new Blob([content],{type:mime}));const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)}
-function csvCell(v){return '"'+String(v??'').replace(/^[=+@\-\t\r]/,'\'$&').replace(/"/g,'""')+'"'}
-function exportCSV(){const rows=[['Date','Record Type','Description','Party','From/Account','To Account','Total','Paid/Transferred','Due','Status'],...db.entries.map(e=>[e.date,e.type,e.note,partyName(e.partyId),ACCOUNT_NAMES[e.account],'',e.total,e.paid,(e.total-e.paid).toFixed(2),e.status]),...db.transfers.map(t=>[t.date,'transfer',t.note,'',ACCOUNT_NAMES[t.from],ACCOUNT_NAMES[t.to],t.amount,t.amount,0,'internal'])];download('skyledger-statement.csv','\uFEFF'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n'),'text/csv;charset=utf-8')}
-function validImport(v){if(!v||v.version!==1||!Array.isArray(v.entries)||!Array.isArray(v.parties)||!Array.isArray(v.transfers)||!v.opening)return false;const keys=Object.keys(ACCOUNT_NAMES);return keys.every(k=>Number.isFinite(v.opening[k])&&v.opening[k]>=0)&&v.parties.every(p=>typeof p.id==='string'&&typeof p.name==='string'&&['Customer','Supplier'].includes(p.kind)&&typeof p.phone==='string')&&v.entries.every(e=>typeof e.id==='string'&&/^\d{4}-\d\d-\d\d$/.test(e.date)&&['in','out'].includes(e.type)&&keys.includes(e.account)&&['full','partial','unpaid'].includes(e.status)&&Number.isFinite(e.total)&&e.total>0&&Number.isFinite(e.paid)&&e.paid>=0&&e.paid<=e.total&&typeof e.partyId==='string')&&v.transfers.every(t=>typeof t.id==='string'&&/^\d{4}-\d\d-\d\d$/.test(t.date)&&keys.includes(t.from)&&keys.includes(t.to)&&t.from!==t.to&&Number.isFinite(t.amount)&&t.amount>0)}
-function remind(id){const p=db.parties.find(x=>x.id===id);if(!p)return;const b=partyBalance(id);const phone=p.phone.replace(/\D/g,'');if(!/^\d{10,15}$/.test(phone)){alert('Please enter a valid WhatsApp number with country code.');return}const msg=b>0?`Hello ${p.name}, this is a friendly reminder that ${money(b)} is outstanding on your account. Please arrange payment. Thank you.`:`Hello ${p.name}, our ledger shows ${money(-b)} payable to you. Please contact us to confirm settlement. Thank you.`;window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(msg),'_blank','noopener,noreferrer')}
-function removeEntry(id){if(confirm('Delete this transaction? This also reverses its outstanding due.')){db.entries=db.entries.filter(e=>e.id!==id);save();render()}}
-function removeTransfer(id){if(confirm('Delete this internal transfer?')){db.transfers=db.transfers.filter(t=>t.id!==id);save();render()}}
-function removeParty(id){if(db.entries.some(e=>e.partyId===id)){alert('This party has ledger entries. Delete or reassign those entries first.');return}if(confirm('Delete this contact?')){db.parties=db.parties.filter(p=>p.id!==id);save();render()}}
-document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action,id=b.dataset.id;if(a==='prev')date=shift(date,-1);else if(a==='next')date=shift(date,1);else if(a==='today')date=today();else if(a==='add-in')return entryModal('in');else if(a==='add-out')return entryModal('out');else if(a==='edit-entry'){const v=db.entries.find(x=>x.id===id);return v&&entryModal(v.type,id)}else if(a==='delete-entry')return removeEntry(id);else if(a==='delete-transfer')return removeTransfer(id);else if(a==='deposit')return transferModal(true);else if(a==='transfer')return transferModal();else if(a==='add-party')return partyModal();else if(a==='edit-party')return partyModal(id);else if(a==='delete-party')return removeParty(id);else if(a==='party-detail')return detailModal(id);else if(a==='settle')return settleModal(id);else if(a==='remind')return remind(id);else if(a==='close')return closeModal();else if(a==='csv')return exportCSV();else if(a==='backup')return download('skyledger-backup-'+today()+'.json',JSON.stringify(db,null,2),'application/json');else if(a==='import')return document.getElementById('importFile').click();else if(a==='opening')return openingModal();render()});
-document.addEventListener('change',e=>{if(e.target.id==='dateInput'){date=e.target.value||today();render()}});
-document.addEventListener('input',e=>{if(e.target.id==='entrySearch'){search=e.target.value;const pos=e.target.selectionStart;render();const el=document.getElementById('entrySearch');el.focus();el.setSelectionRange(pos,pos)}if(e.target.id==='partySearch'){partySearch=e.target.value;const pos=e.target.selectionStart;render();const el=document.getElementById('partySearch');el.focus();el.setSelectionRange(pos,pos)}});
-document.addEventListener('submit',e=>{const f=e.target;if(!['entryForm','partyForm','transferForm','openingForm','settleForm'].includes(f.id))return;e.preventDefault();const v=Object.fromEntries(new FormData(f).entries());if(f.id==='entryForm'){const total=amount(v.total),paid=v.status==='full'?total:v.status==='unpaid'?0:amount(v.paid);if(!Number.isFinite(total)||total<=0||!Number.isFinite(paid)||paid<0||paid>total){alert('Enter a valid total and payment amount.');return}if(v.status==='partial'&&(paid<=0||paid>=total)){alert('Partial payment must be greater than zero and less than the total.');return}if(v.status!=='full'&&!v.partyId){alert('Choose a party for unpaid or partial transactions.');return}if(v.partyId&&!db.parties.some(p=>p.id===v.partyId)){alert('Party not found.');return}const old=db.entries.find(x=>x.id===v.id);const obj={id:old?.id||uid(),created:old?.created||Date.now(),type:v.type,date:v.date,account:v.account,status:v.status,total,paid,partyId:v.partyId,note:v.note.trim()};if(old)Object.assign(old,obj);else db.entries.push(obj)}else if(f.id==='partyForm'){const name=v.name.trim();if(!name){alert('Enter a name');return}const old=db.parties.find(p=>p.id===v.id);const obj={id:old?.id||uid(),name,kind:v.kind,phone:v.phone.trim()};if(old)Object.assign(old,obj);else db.parties.push(obj)}else if(f.id==='transferForm'){const n=amount(v.amount);if(!Number.isFinite(n)||n<=0||v.from===v.to){alert('Enter a valid transfer between different accounts.');return}const balance=accountBalances(v.date)[v.from];if(n>balance+.001){alert('Insufficient balance in source account on this date.');return}db.transfers.push({id:uid(),created:Date.now(),date:v.date,from:v.from,to:v.to,amount:n,note:v.note.trim()})}else if(f.id==='openingForm'){const obj={};for(const k of Object.keys(ACCOUNT_NAMES)){obj[k]=amount(v[k]);if(!Number.isFinite(obj[k])){alert('Invalid opening amount');return}}db.opening=obj}else if(f.id==='settleForm'){const n=amount(v.amount),b=partyBalance(v.partyId);if(!Number.isFinite(n)||n<=0||n>Math.abs(b)+.001){alert('Settlement must not exceed outstanding balance.');return}db.entries.push({id:uid(),created:Date.now(),date:v.date,type:b>0?'in':'out',account:v.account,status:'full',total:n,paid:n,partyId:v.partyId,note:'Due settlement'});}save();closeModal();render()});
-document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{tab=b.dataset.tab;search='';render()}));document.getElementById('addPartyTop').onclick=()=>partyModal();document.getElementById('backupBtn').onclick=()=>{tab='reports';render()};document.getElementById('frameBtn').onclick=()=>{document.getElementById('device').classList.toggle('full');document.getElementById('frameBtn').innerHTML=document.getElementById('device').classList.contains('full')?'<i class="fa-solid fa-mobile-screen mr-2"></i>Phone Frame':'<i class="fa-solid fa-expand mr-2"></i>Toggle Full Screen'};
-document.getElementById('importFile').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{const data=JSON.parse(await file.text());if(!validImport(data))throw Error('Invalid or unsupported SkyLedger backup.');if(confirm('Replace ALL current data with this backup? Export your current backup first.')){db=data;save();closeModal();render();alert('Backup imported successfully.')}}catch(err){alert(err.message)}e.target.value=''});render();
-</script></body></html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>SkyLedger • Daily Business Register</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <style>
+    body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #eaf2fa; }
+    .phone { width: 410px; max-width: 100%; height: min(860px, calc(100dvh - 40px)); border: 9px solid #152c46; border-radius: 42px; box-shadow: 0 28px 75px #18365335; overflow: hidden; }
+    .full { width: 100%; height: 100dvh; border: 0; border-radius: 0; box-shadow: none; }
+    .shell { height: 100%; display: flex; flex-direction: column; background: #f8fbff; }
+    .scroll { overflow-y: auto; min-height: 0; flex: 1; scrollbar-width: thin; }
+    .nav { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+    .field { width: 100%; border: 1px solid #dbe6f0; border-radius: 12px; padding: 11px 12px; background: white; outline: none; }
+    .field:focus { border-color: #0284c7; box-shadow: 0 0 0 3px #0284c719; }
+    .btn { border-radius: 12px; padding: 11px 14px; font-weight: 650; }
+    .card { background: white; border: 1px solid #e4edf5; border-radius: 18px; box-shadow: 0 3px 15px #164e6310; }
+    .small { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; font-weight: 700; color: #64748b; }
+    .modal-backdrop { position: fixed; inset: 0; background: #0f172a99; display: flex; align-items: center; justify-content: center; z-index: 30; padding: 12px; }
+    .modal { width: min(440px, 100%); max-height: 92dvh; overflow-y: auto; border-radius: 22px; background: #fff; padding: 20px; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    @media(max-width: 500px) {
+      body { background: #f8fbff; }
+      .phone { width: 100%; height: 100dvh; border: 0; border-radius: 0; box-shadow: none; }
+      #frameBtn { display: none; }
+    }
+  </style>
+</head>
+<body class="text-slate-800">
+  <div class="min-h-dvh flex flex-col items-center justify-center md:p-5">
+    <button id="frameBtn" class="mb-3 rounded-full bg-white px-5 py-2 text-sm font-semibold text-sky-700 shadow">
+      <i class="fa-solid fa-mobile-screen-button mr-2"></i>Toggle Full Screen
+    </button>
+    <div id="device" class="phone">
+      <div class="shell">
+        <header class="bg-white border-b border-slate-100 px-5 pt-5 pb-3 flex items-center justify-between">
+          <div>
+            <div class="text-xs tracking-widest font-bold text-sky-600">SKYLEDGER</div>
+            <h1 id="pageTitle" class="font-extrabold text-xl">Daily Register</h1>
+          </div>
+          <div class="flex gap-2">
+            <button id="backupBtn" title="Backup and import" class="w-10 h-10 rounded-xl bg-sky-50 text-sky-700"><i class="fa-solid fa-cloud-arrow-down"></i></button>
+            <button id="addPartyTop" title="Add party" class="w-10 h-10 rounded-xl bg-sky-600 text-white"><i class="fa-solid fa-user-plus"></i></button>
+          </div>
+        </header>
+        <main id="main" class="scroll px-4 py-4"></main>
+        <nav class="nav bg-white border-t border-slate-100 flex justify-around pt-3">
+          <button data-tab="register" class="tab flex flex-col items-center gap-1 text-xs font-semibold"><i class="fa-solid fa-book text-lg"></i>Register</button>
+          <button data-tab="parties" class="tab flex flex-col items-center gap-1 text-xs font-semibold"><i class="fa-solid fa-address-book text-lg"></i>Khatabook</button>
+          <button data-tab="reports" class="tab flex flex-col items-center gap-1 text-xs font-semibold"><i class="fa-solid fa-chart-pie text-lg"></i>Reports</button>
+        </nav>
+      </div>
+    </div>
+  </div>
+  <div id="modalRoot"></div>
+  <input type="file" id="importFile" accept="application/json,.json" class="hidden">
+
+  <script>
+    'use strict';
+    const KEY = 'skyledger_v2';
+    const ACCOUNT_NAMES = { cash: 'Cash Drawer', bank: 'Bank Account', upi: 'UPI', card: 'Card' };
+    
+    const initial = () => ({
+      version: 1,
+      opening: { cash: 0, bank: 0, upi: 0, card: 0 },
+      parties: [],
+      entries: [],
+      transfers: []
+    });
+
+    let db = load();
+    let tab = 'register';
+    let date = today();
+    let search = '';
+    let partySearch = '';
+
+    function load() {
+      try {
+        const raw = localStorage.getItem(KEY);
+        if (!raw) return initial();
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.version === 1) return parsed;
+      } catch (e) {
+        console.error('Error loading data:', e);
+      }
+      return initial();
+    }
+
+    function save() {
+      try {
+        localStorage.setItem(KEY, JSON.stringify(db));
+        return true;
+      } catch (e) {
+        alert('Storage error: Unable to save changes. Make sure your browser storage is enabled.');
+        return false;
+      }
+    }
+
+    function today() {
+      const d = new Date();
+      return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
+    }
+
+    function shift(d, n) {
+      const x = new Date(d + 'T12:00:00');
+      x.setDate(x.getDate() + n);
+      return [x.getFullYear(), String(x.getMonth() + 1).padStart(2, '0'), String(x.getDate()).padStart(2, '0')].join('-');
+    }
+
+    function money(n) {
+      return '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function esc(v) {
+      return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function uid() {
+      return Date.now().toString(36) + Math.random().toString(36.slice(2));
+    }
+
+    function amount(v) {
+      const n = Number(v);
+      return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : NaN;
+    }
+
+    function signed(e) {
+      return e.type === 'in' ? e.paid : -e.paid;
+    }
+
+    function accountBalances(until) {
+      const b = { ...db.opening };
+      for (const e of db.entries) {
+        if (!until || e.date <= until) b[e.account] = (b[e.account] || 0) + signed(e);
+      }
+      for (const t of db.transfers) {
+        if (!until || t.date <= until) {
+          b[t.from] -= t.amount;
+          b[t.to] += t.amount;
+        }
+      }
+      return b;
+    }
+
+    function cashBefore(d) {
+      const prev = db.entries.filter(e => e.date < d && e.account === 'cash').reduce((s, e) => s + signed(e), 0);
+      const move = db.transfers.filter(t => t.date < d).reduce((s, t) => s + (t.to === 'cash' ? t.amount : 0) - (t.from === 'cash' ? t.amount : 0), 0);
+      return (db.opening.cash || 0) + prev + move;
+    }
+
+    function cashDay(d) {
+      const es = db.entries.filter(e => e.date === d && e.account === 'cash');
+      const incoming = es.filter(e => e.type === 'in').reduce((s, e) => s + e.paid, 0);
+      const outgoing = es.filter(e => e.type === 'out').reduce((s, e) => s + e.paid, 0);
+      const transferNet = db.transfers.filter(t => t.date === d).reduce((s, t) => s + (t.to === 'cash' ? t.amount : 0) - (t.from === 'cash' ? t.amount : 0), 0);
+      const opening = cashBefore(d);
+      return { incoming, outgoing, transferNet, opening, closing: opening + incoming - outgoing + transferNet };
+    }
+
+    function partyBalance(id) {
+      return db.entries.filter(e => e.partyId === id).reduce((s, e) => s + (e.note === 'Due settlement' ? (e.type === 'in' ? -e.paid : e.paid) : (e.type === 'in' ? e.total - e.paid : -(e.total - e.paid))), 0);
+    }
+
+    function partyName(id) {
+      return db.parties.find(p => p.id === id)?.name || 'Unlinked';
+    }
+
+    function render() {
+      document.getElementById('pageTitle').textContent = { register: 'Daily Register', parties: 'Party Khatabook', reports: 'Business Reports' }[tab];
+      document.querySelectorAll('.tab').forEach(x => {
+        x.className = 'tab flex flex-col items-center gap-1 text-xs font-semibold ' + (x.dataset.tab === tab ? 'text-sky-600' : 'text-slate-400');
+      });
+      document.getElementById('main').innerHTML = tab === 'register' ? renderRegister() : tab === 'parties' ? renderParties() : renderReports();
+    }
+
+    function renderRegister() {
+      const c = cashDay(date);
+      const balances = accountBalances(date);
+      const entries = db.entries.filter(e => e.date === date && [e.note, partyName(e.partyId), e.type].join(' ').toLowerCase().includes(search.toLowerCase())).sort((a, b) => b.created - a.created);
+      const transfers = db.transfers.filter(t => t.date === date).map(t => ({ kind: 'transfer', ...t }));
+      const rows = [...entries.map(e => ({ kind: 'entry', ...e })), ...(!search ? transfers : [])].sort((a, b) => b.created - a.created);
+      
+      return `
+        <div class="card p-3 mb-4 flex items-center gap-2">
+          <button data-action="prev" class="px-2 text-sky-600"><i class="fa-solid fa-chevron-left"></i></button>
+          <input id="dateInput" type="date" value="${date}" class="field text-sm flex-1 min-w-0">
+          <button data-action="next" class="px-2 text-sky-600"><i class="fa-solid fa-chevron-right"></i></button>
+          <button data-action="today" class="text-xs bg-sky-100 text-sky-700 rounded-lg px-2 py-3 font-bold">Today</button>
+        </div>
+        <div class="rounded-2xl bg-gradient-to-br from-sky-700 to-sky-500 text-white p-5 shadow-lg shadow-sky-200">
+          <div class="text-sm opacity-85">Closing Cash in Hand</div>
+          <div class="text-3xl font-extrabold mt-1">${money(c.closing)}</div>
+          <div class="grid grid-cols-3 gap-2 mt-5 text-xs">
+            <div><div class="opacity-75">Opening</div><strong>${money(c.opening)}</strong></div>
+            <div><div class="opacity-75">Cash In</div><strong>${money(c.incoming)}</strong></div>
+            <div><div class="opacity-75">Cash Out</div><strong>${money(c.outgoing)}</strong></div>
+          </div>
+          <div class="text-xs mt-3 opacity-90">Internal transfer adjustment: ${money(c.transferNet)}</div>
+          <button data-action="deposit" class="mt-4 w-full rounded-xl bg-white text-sky-700 font-bold py-3"><i class="fa-solid fa-building-columns mr-2"></i>Deposit Cash to Bank</button>
+        </div>
+        <div class="grid grid-cols-2 gap-3 mt-4">
+          <button data-action="add-in" class="btn bg-emerald-600 text-white"><i class="fa-solid fa-arrow-down mr-2"></i>Cash In</button>
+          <button data-action="add-out" class="btn bg-rose-600 text-white"><i class="fa-solid fa-arrow-up mr-2"></i>Cash Out</button>
+        </div>
+        <div class="flex justify-between items-center mt-6 mb-3">
+          <h2 class="font-bold">Account Balances</h2>
+          <button data-action="transfer" class="text-sky-600 text-sm font-bold">Transfer <i class="fa-solid fa-right-left"></i></button>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          ${Object.entries(ACCOUNT_NAMES).map(([k, v]) => `<div class="card p-3"><div class="small">${v}</div><div class="font-extrabold mt-1 text-base">${money(balances[k])}</div></div>`).join('')}
+        </div>
+        <div class="flex items-center justify-between mt-6 mb-3">
+          <h2 class="font-bold">Daily Activity</h2>
+          <span class="text-xs text-slate-500">${rows.length} records</span>
+        </div>
+        <input id="entrySearch" class="field mb-3" placeholder="Search transactions" value="${esc(search)}">
+        ${rows.length ? rows.map(r => r.kind === 'transfer' ? `
+          <div class="card p-3 mb-2 flex gap-3 items-center">
+            <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 grid place-items-center"><i class="fa-solid fa-right-left"></i></div>
+            <div class="flex-1 min-w-0">
+              <div class="font-bold text-sm">${esc(ACCOUNT_NAMES[r.from])} → ${esc(ACCOUNT_NAMES[r.to])}</div>
+              <div class="text-xs text-slate-500">Internal transfer • ${esc(r.note || '')}</div>
+            </div>
+            <div class="text-right"><b>${money(r.amount)}</b><button data-action="delete-transfer" data-id="${r.id}" class="block text-xs text-rose-500 ml-auto">Delete</button></div>
+          </div>
+        ` : `
+          <div class="card p-3 mb-2 flex gap-3 items-center">
+            <div class="w-10 h-10 rounded-xl ${r.type === 'in' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'} grid place-items-center">
+              <i class="fa-solid fa-${r.type === 'in' ? 'arrow-down' : 'arrow-up'}"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="font-bold text-sm truncate">${esc(r.note || partyName(r.partyId))}</div>
+              <div class="text-xs text-slate-500">${esc(ACCOUNT_NAMES[r.account])} • ${esc(r.status)}${r.partyId ? ' • ' + esc(partyName(r.partyId)) : ''}</div>
+              ${r.total > r.paid ? `<div class="text-xs text-amber-600">Due ${money(r.total - r.paid)}</div>` : ''}
+            </div>
+            <div class="text-right">
+              <div class="font-extrabold ${r.type === 'in' ? 'text-emerald-600' : 'text-rose-600'}">${r.type === 'in' ? '+' : '−'}${money(r.paid)}</div>
+              <div class="flex gap-2 justify-end text-xs mt-1">
+                <button data-action="edit-entry" data-id="${r.id}" class="text-sky-600">Edit</button>
+                <button data-action="delete-entry" data-id="${r.id}" class="text-rose-500">Delete</button>
+              </div>
+            </div>
+          </div>
+        `).join('') : `<div class="card p-8 text-center text-slate-400">No activity for this date.</div>`}
+      `;
+    }
+
+    function renderParties() {
+      const ps = db.parties.filter(p => [p.name, p.phone, p.kind].join(' ').toLowerCase().includes(partySearch.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name));
+      const get = db.parties.reduce((s, p) => s + Math.max(0, partyBalance(p.id)), 0);
+      const give = db.parties.reduce((s, p) => s + Math.max(0, -partyBalance(p.id)), 0);
+      
+      return `
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div class="card p-4"><div class="small">You Will Get</div><div class="font-extrabold text-emerald-600 text-xl mt-2">${money(get)}</div></div>
+          <div class="card p-4"><div class="small">You Will Give</div><div class="font-extrabold text-rose-600 text-xl mt-2">${money(give)}</div></div>
+        </div>
+        <button data-action="add-party" class="btn bg-sky-600 text-white w-full mb-4"><i class="fa-solid fa-user-plus mr-2"></i>Add Customer / Supplier</button>
+        <input id="partySearch" class="field mb-4" placeholder="Search name or phone" value="${esc(partySearch)}">
+        ${ps.length ? ps.map(p => {
+          const b = partyBalance(p.id);
+          return `
+            <div class="card p-4 mb-3">
+              <div class="flex justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="font-bold truncate">${esc(p.name)}</div>
+                  <div class="text-xs text-slate-500">${esc(p.kind)}${p.phone ? ' • ' + esc(p.phone) : ''}</div>
+                </div>
+                <div class="text-right">
+                  <div class="font-bold ${b > 0 ? 'text-emerald-600' : b < 0 ? 'text-rose-600' : 'text-slate-500'}">${money(Math.abs(b))}</div>
+                  <div class="text-xs">${b > 0 ? 'You Will Get' : b < 0 ? 'You Will Give' : 'Settled'}</div>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-3 border-t border-slate-100 pt-3 mt-3 text-xs font-bold">
+                <button data-action="party-detail" data-id="${p.id}" class="text-sky-600">Ledger</button>
+                <button data-action="settle" data-id="${p.id}" class="text-emerald-600" ${Math.abs(b) < 0.005 ? 'disabled' : ''}>Settle Due</button>
+                <button data-action="remind" data-id="${p.id}" class="text-green-600" ${!p.phone || Math.abs(b) < 0.005 ? 'disabled' : ''}><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+                <button data-action="edit-party" data-id="${p.id}" class="text-slate-500">Edit</button>
+                <button data-action="delete-party" data-id="${p.id}" class="text-rose-500">Delete</button>
+              </div>
+            </div>
+          `;
+        }).join('') : '<div class="card p-8 text-center text-slate-400">No contacts yet.</div>'}
+      `;
+    }
+
+    function renderReports() {
+      const totals = { in: 0, out: 0, dueGet: 0, dueGive: 0 };
+      db.entries.forEach(e => totals[e.type] += e.paid);
+      db.parties.forEach(p => {
+        const b = partyBalance(p.id);
+        totals.dueGet += Math.max(0, b);
+        totals.dueGive += Math.max(0, -b);
+      });
+      const b = accountBalances();
+      
+      return `
+        <div class="card p-5">
+          <div class="small mb-2">All-time received / paid</div>
+          <div class="grid grid-cols-2 gap-4">
+            <div><div class="text-sm text-slate-500">Money In</div><div class="font-extrabold text-emerald-600 text-xl">${money(totals.in)}</div></div>
+            <div><div class="text-sm text-slate-500">Money Out</div><div class="font-extrabold text-rose-600 text-xl">${money(totals.out)}</div></div>
+          </div>
+          <div class="border-t mt-4 pt-3 flex justify-between font-bold"><span>Net Cash Flow</span><span>${money(totals.in - totals.out)}</span></div>
+        </div>
+        <div class="card p-5 mt-4">
+          <div class="font-bold mb-3">Current Accounts</div>
+          ${Object.entries(ACCOUNT_NAMES).map(([k, n]) => `<div class="flex justify-between py-2 border-b last:border-0 text-sm"><span>${n}</span><b>${money(b[k])}</b></div>`).join('')}
+          <div class="flex justify-between pt-3 font-bold text-sky-700"><span>Total Funds</span><span>${money(Object.values(b).reduce((a, v) => a + v, 0))}</span></div>
+        </div>
+        <div class="card p-5 mt-4">
+          <div class="font-bold mb-3">Outstanding Credit</div>
+          <div class="flex justify-between text-sm mb-2"><span>You Will Get</span><b class="text-emerald-600">${money(totals.dueGet)}</b></div>
+          <div class="flex justify-between text-sm"><span>You Will Give</span><b class="text-rose-600">${money(totals.dueGive)}</b></div>
+        </div>
+        <div class="card p-5 mt-4">
+          <h2 class="font-bold mb-2">Data & Statements</h2>
+          <p class="text-xs text-slate-500 mb-3">CSV includes all entries. JSON includes all backup data.</p>
+          <div class="grid grid-cols-2 gap-2">
+            <button data-action="csv" class="btn bg-sky-50 text-sky-700 text-sm">Export CSV</button>
+            <button data-action="backup" class="btn bg-sky-600 text-white text-sm">JSON Backup</button>
+            <button data-action="import" class="btn bg-slate-100 text-slate-700 text-sm">Import JSON</button>
+            <button data-action="opening" class="btn bg-slate-100 text-slate-700 text-sm">Opening Funds</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function showModal(html) {
+      document.getElementById('modalRoot').innerHTML = `<div class="modal-backdrop" id="overlay"><div class="modal" role="dialog" aria-modal="true">${html}</div></div>`;
+      document.getElementById('overlay').addEventListener('click', e => { if (e.target.id === 'overlay') closeModal(); });
+    }
+
+    function closeModal() { document.getElementById('modalRoot').innerHTML = ''; }
+
+    function header(t) {
+      return `<div class="flex justify-between items-center mb-4"><h2 class="text-xl font-extrabold">${t}</h2><button data-action="close" class="w-9 h-9 bg-slate-100 rounded-xl"><i class="fa-solid fa-xmark"></i></button></div>`;
+    }
+
+    function opts(items, selected) {
+      return items.map(([v, t]) => `<option value="${esc(v)}" ${v === selected ? 'selected' : ''}>${esc(t)}</option>`).join('');
+    }
+
+    function entryModal(type, id) {
+      const e = db.entries.find(x => x.id === id);
+      const v = e || { type, date, account: 'cash', status: 'full', total: '', paid: '', partyId: '', note: '' };
+      
+      showModal(header(e ? 'Edit Transaction' : type === 'in' ? 'Record Cash In' : 'Record Cash Out') + `
+        <form id="entryForm" class="space-y-3">
+          <input type="hidden" name="id" value="${esc(id || '')}">
+          <input type="hidden" name="type" value="${type}">
+          <label class="block text-sm font-semibold">Date<input name="date" type="date" required class="field mt-1" value="${v.date}"></label>
+          <label class="block text-sm font-semibold">Description<input name="note" class="field mt-1" maxlength="150" placeholder="Sale, purchase, expense..." value="${esc(v.note)}"></label>
+          <label class="block text-sm font-semibold">Total Transaction Amount<input id="totalAmount" name="total" type="number" step="0.01" min="0.01" required class="field mt-1" value="${v.total}"></label>
+          <label class="block text-sm font-semibold">Payment Status<select id="paymentStatus" name="status" class="field mt-1">${opts([['full', 'Full'], ['partial', 'Partial'], ['unpaid', 'Unpaid (Credit)']], v.status)}</select></label>
+          <div id="paidArea"><label class="block text-sm font-semibold">Amount ${type === 'in' ? 'Received' : 'Paid'} Now<input id="paidAmount" name="paid" type="number" step="0.01" min="0" class="field mt-1" value="${v.paid}"></label></div>
+          <div id="duePreview" class="bg-amber-50 text-amber-800 p-3 rounded-xl text-sm"></div>
+          <label class="block text-sm font-semibold">Account<select name="account" class="field mt-1">${opts(Object.entries(ACCOUNT_NAMES), v.account)}</select></label>
+          <label class="block text-sm font-semibold">Party / Contact<select id="entryParty" name="partyId" class="field mt-1"><option value="">No party</option>${opts(db.parties.map(p => [p.id, p.name + ' (' + p.kind + ')']), v.partyId)}</select></label>
+          <button class="btn bg-sky-600 text-white w-full" type="submit">Save Transaction</button>
+        </form>
+      `);
+
+      function update() {
+        const status = document.getElementById('paymentStatus').value;
+        const total = amount(document.getElementById('totalAmount').value);
+        const paidEl = document.getElementById('paidAmount');
+        document.getElementById('paidArea').style.display = status === 'full' || status === 'unpaid' ? 'none' : '';
+        if (status === 'full') paidEl.value = Number.isFinite(total) ? total : '';
+        if (status === 'unpaid') paidEl.value = 0;
+        const paid = amount(paidEl.value);
+        document.getElementById('duePreview').textContent = `Outstanding due: ${money(Number.isFinite(total) && Number.isFinite(paid) ? Math.max(0, total - paid) : 0)}`;
+      }
+      ['paymentStatus', 'totalAmount', 'paidAmount'].forEach(k => document.getElementById(k).addEventListener('input', update));
+      update();
+    }
+
+    function partyModal(id) {
+      const p = db.parties.find(x => x.id === id) || { name: '', kind: 'Customer', phone: '' };
+      showModal(header(id ? 'Edit Contact' : 'Add Contact') + `
+        <form id="partyForm" class="space-y-3">
+          <input name="id" type="hidden" value="${esc(id || '')}">
+          <label class="block text-sm font-semibold">Name<input name="name" class="field mt-1" required maxlength="100" value="${esc(p.name)}"></label>
+          <label class="block text-sm font-semibold">Type<select name="kind" class="field mt-1">${opts([['Customer', 'Customer'], ['Supplier', 'Supplier / Vendor']], p.kind)}</select></label>
+          <label class="block text-sm font-semibold">WhatsApp Phone (with country code)<input name="phone" class="field mt-1" placeholder="919876543210" value="${esc(p.phone)}"></label>
+          <button class="btn bg-sky-600 text-white w-full">Save Contact</button>
+        </form>
+      `);
+    }
+
+    function transferModal(deposit = false) {
+      const b = accountBalances(date);
+      showModal(header(deposit ? 'Deposit Cash to Bank' : 'Transfer Funds') + `
+        <form id="transferForm" class="space-y-3">
+          <input name="date" type="hidden" value="${date}">
+          <label class="block text-sm font-semibold">From Account<select name="from" class="field mt-1" ${deposit ? 'disabled' : ''}>${opts(Object.entries(ACCOUNT_NAMES), 'cash')}</select></label>
+          ${deposit ? '<input type="hidden" name="from" value="cash">' : ''}
+          <label class="block text-sm font-semibold">To Account<select name="to" class="field mt-1" ${deposit ? 'disabled' : ''}>${opts(Object.entries(ACCOUNT_NAMES), 'bank')}</select></label>
+          ${deposit ? '<input type="hidden" name="to" value="bank">' : ''}
+          <label class="block text-sm font-semibold">Amount<input name="amount" type="number" step="0.01" min="0.01" required class="field mt-1"></label>
+          <label class="block text-sm font-semibold">Note<input name="note" class="field mt-1" maxlength="150" placeholder="Optional"></label>
+          <p class="text-xs text-slate-500">Available cash: ${money(b.cash)}</p>
+          <button class="btn bg-sky-600 text-white w-full">Confirm Transfer</button>
+        </form>
+      `);
+    }
+
+    function openingModal() {
+      showModal(header('Initial Account Balances') + `
+        <form id="openingForm" class="space-y-3">
+          ${Object.entries(ACCOUNT_NAMES).map(([k, n]) => `<label class="block text-sm font-semibold">${n}<input name="${k}" type="number" step="0.01" min="0" required class="field mt-1" value="${db.opening[k] || 0}"></label>`).join('')}
+          <button class="btn bg-sky-600 text-white w-full">Save Opening Balances</button>
+        </form>
+      `);
+    }
+
+    function detailModal(id) {
+      const p = db.parties.find(x => x.id === id);
+      if (!p) return;
+      const es = db.entries.filter(e => e.partyId === id).sort((a, b) => b.date.localeCompare(a.date));
+      showModal(header(esc(p.name) + ' Ledger') + `
+        <p class="font-bold mb-3">${partyBalance(id) >= 0 ? 'You Will Get' : 'You Will Give'}: ${money(Math.abs(partyBalance(id)))}</p>
+        ${es.length ? es.map(e => `<div class="border-b py-3 text-sm"><div class="flex justify-between"><b>${esc(e.note || 'Transaction')}</b><b>${e.type === 'in' ? '+' : '−'}${money(e.total - e.paid)} due</b></div><div class="text-xs text-slate-500">${e.date} • Total ${money(e.total)} • Paid ${money(e.paid)}</div></div>`).join('') : '<p class="text-slate-500">No ledger entries.</p>'}
+      `);
+    }
+
+    function settleModal(id) {
+      const p = db.parties.find(x => x.id === id), b = partyBalance(id);
+      if (!p || Math.abs(b) < 0.005) return;
+      showModal(header('Settle ' + esc(p.name)) + `
+        <form id="settleForm" class="space-y-3">
+          <input type="hidden" name="partyId" value="${id}">
+          <input type="hidden" name="date" value="${date}">
+          <label class="block text-sm font-semibold">Amount<input type="number" name="amount" step="0.01" min="0.01" max="${Math.abs(b).toFixed(2)}" value="${Math.abs(b).toFixed(2)}" class="field mt-1" required></label>
+          <label class="block text-sm font-semibold">Account<select name="account" class="field mt-1">${opts(Object.entries(ACCOUNT_NAMES), 'cash')}</select></label>
+          <button class="btn bg-sky-600 text-white w-full">Record Settlement</button>
+        </form>
+      `);
+    }
+
+    function download(name, content, mime) {
+      const url = URL.createObjectURL(new Blob([content], { type: mime }));
+      const a = document.createElement('a'); a.href = url; a.download = name;
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }
+
+    function exportCSV() {
+      const rows = [
+        ['Date', 'Type', 'Description', 'Party', 'Account', 'Total', 'Paid', 'Due', 'Status'],
+        ...db.entries.map(e => [e.date, e.type, e.note, partyName(e.partyId), ACCOUNT_NAMES[e.account], e.total, e.paid, (e.total - e.paid).toFixed(2), e.status])
+      ];
+      download('skyledger-statement.csv', '\uFEFF' + rows.map(r => r.join(',')).join('\r\n'), 'text/csv;charset=utf-8');
+    }
+
+    function remind(id) {
+      const p = db.parties.find(x => x.id === id);
+      if (!p || !p.phone) return;
+      const b = partyBalance(id);
+      const phone = p.phone.replace(/\D/g, '');
+      const msg = `Hello ${p.name}, reminder that ${money(Math.abs(b))} is outstanding on your account. Thank you.`;
+      window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank', 'noopener,noreferrer');
+    }
+
+    document.addEventListener('click', e => {
+      const b = e.target.closest('[data-action]');
+      if (!b) return;
+      const a = b.dataset.action, id = b.dataset.id;
+      if (a === 'prev') date = shift(date, -1);
+      else if (a === 'next') date = shift(date, 1);
+      else if (a === 'today') date = today();
+      else if (a === 'add-in') return entryModal('in');
+      else if (a === 'add-out') return entryModal('out');
+      else if (a === 'edit-entry') { const v = db.entries.find(x => x.id === id); return v && entryModal(v.type, id); }
+      else if (a === 'delete-entry') { db.entries = db.entries.filter(x => x.id !== id); save(); }
+      else if (a === 'delete-transfer') { db.transfers = db.transfers.filter(x => x.id !== id); save(); }
+      else if (a === 'deposit') return transferModal(true);
+      else if (a === 'transfer') return transferModal();
+      else if (a === 'add-party') return partyModal();
+      else if (a === 'edit-party') return partyModal(id);
+      else if (a === 'delete-party') { db.parties = db.parties.filter(x => x.id !== id); save(); }
+      else if (a === 'party-detail') return detailModal(id);
+      else if (a === 'settle') return settleModal(id);
+      else if (a === 'remind') return remind(id);
+      else if (a === 'close') return closeModal();
+      else if (a === 'csv') return exportCSV();
+      else if (a === 'backup') return download('skyledger-backup.json', JSON.stringify(db, null, 2), 'application/json');
+      else if (a === 'opening') return openingModal();
+      render();
+    });
+
+    document.addEventListener('change', e => {
+      if (e.target.id === 'dateInput') { date = e.target.value || today(); render(); }
+    });
+
+    document.addEventListener('submit', e => {
+      e.preventDefault();
+      const f = e.target;
+      const v = Object.fromEntries(new FormData(f).entries());
+
+      if (f.id === 'entryForm') {
+        const total = amount(v.total);
+        const paid = v.status === 'full' ? total : v.status === 'unpaid' ? 0 : amount(v.paid);
+        if (!Number.isFinite(total) || total <= 0) { alert('Invalid total amount'); return; }
+        
+        const old = db.entries.find(x => x.id === v.id);
+        const obj = {
+          id: old?.id || uid(),
+          created: old?.created || Date.now(),
+          type: v.type,
+          date: v.date,
+          account: v.account,
+          status: v.status,
+          total,
+          paid,
+          partyId: v.partyId || '',
+          note: (v.note || '').trim()
+        };
+        if (old) Object.assign(old, obj); else db.entries.push(obj);
+      } else if (f.id === 'partyForm') {
+        const name = (v.name || '').trim();
+        if (!name) return;
+        const old = db.parties.find(x => x.id === v.id);
+        const obj = { id: old?.id || uid(), name, kind: v.kind, phone: (v.phone || '').trim() };
+        if (old) Object.assign(old, obj); else db.parties.push(obj);
+      } else if (f.id === 'transferForm') {
+        const n = amount(v.amount);
+        if (!Number.isFinite(n) || n <= 0 || v.from === v.to) return;
+        db.transfers.push({ id: uid(), created: Date.now(), date: v.date, from: v.from, to: v.to, amount: n, note: (v.note || '').trim() });
+      } else if (f.id === 'openingForm') {
+        for (const k of Object.keys(ACCOUNT_NAMES)) db.opening[k] = amount(v[k]) || 0;
+      } else if (f.id === 'settleForm') {
+        const n = amount(v.amount);
+        const b = partyBalance(v.partyId);
+        if (n > 0) {
+          db.entries.push({
+            id: uid(), created: Date.now(), date: v.date,
+            type: b > 0 ? 'in' : 'out', account: v.account,
+            status: 'full', total: n, paid: n, partyId: v.partyId, note: 'Due settlement'
+          });
+        }
+      }
+
+      save();
+      closeModal();
+      render();
+    });
+
+    document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => { tab = b.dataset.tab; search = ''; render(); }));
+    document.getElementById('addPartyTop').onclick = () => partyModal();
+    document.getElementById('backupBtn').onclick = () => { tab = 'reports'; render(); };
+    document.getElementById('frameBtn').onclick = () => {
+      document.getElementById('device').classList.toggle('full');
+      document.getElementById('frameBtn').innerHTML = document.getElementById('device').classList.contains('full') ? '<i class="fa-solid fa-mobile-screen mr-2"></i>Phone Frame' : '<i class="fa-solid fa-expand mr-2"></i>Toggle Full Screen';
+    };
+
+    render();
+  </script>
+</body>
+</html>
