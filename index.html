@@ -1,692 +1,2133 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>SkyLedger • Daily Business Register</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-  <style>
-    body { font-family: Inter, system-ui, sans-serif; background: #eaf2fa; }
-    .phone { width: 410px; max-width: 100%; height: min(860px, calc(100dvh - 40px)); border: 9px solid #152c46; border-radius: 42px; box-shadow: 0 28px 75px #18365335; overflow: hidden; }
-    .full { width: 100% !important; height: 100dvh !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
-    .shell { height: 100%; display: flex; flex-direction: column; background: #f8fbff; }
-    .scroll { overflow-y: auto; min-height: 0; flex: 1; scrollbar-width: thin; }
-    .nav { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
-    .field { width: 100%; border: 1px solid #dbe6f0; border-radius: 12px; padding: 11px 12px; background: white; outline: none; }
-    .field:focus { border-color: #0284c7; box-shadow: 0 0 0 3px #0284c719; }
-    .btn { border-radius: 12px; padding: 11px 14px; font-weight: 650; }
-    .card { background: white; border: 1px solid #e4edf5; border-radius: 18px; box-shadow: 0 3px 15px #164e6310; }
-    .small { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; font-weight: 700; color: #64748b; }
-    .modal-backdrop { position: fixed; inset: 0; background: #0f172a99; display: flex; align-items: center; justify-content: center; z-index: 30; padding: 12px; }
-    .modal { width: min(440px, 100%); max-height: 92dvh; overflow-y: auto; border-radius: 22px; background: #fff; padding: 20px; }
-    button:disabled { opacity: .45; cursor: not-allowed; }
-    @media(max-width: 500px) {
-      body { background: #f8fbff; }
-      .phone { width: 100%; height: 100dvh; border: 0; border-radius: 0; box-shadow: none; }
-      #frameBtn { display: none; }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SKYLEDGER - Daily Register & Business Khata</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        sky: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #e2e8f0;
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* Mobile App Shell Frame on Desktop, Full Bleed on Mobile */
+        #app-shell {
+            max-width: 480px;
+            min-height: 100dvh;
+            margin: 0 auto;
+            background-color: #f6f9fc;
+            position: relative;
+            box-shadow: 0 20px 50px -12px rgba(15, 23, 42, 0.16);
+            display: flex;
+            flex-direction: column;
+        }
+        .tabular-nums {
+            font-variant-numeric: tabular-nums;
+        }
+        .hero-blue-card {
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 58%, #0369a1 100%);
+        }
+        /* Hide scrollbars cleanly while keeping scrollability */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        /* Print Styles for Clean PDF Statement */
+        @media print {
+            body {
+                background: white !important;
+            }
+            #app-shell > *:not(#modal-statement) {
+                display: none !important;
+            }
+            #modal-statement {
+                position: static !important;
+                background: white !important;
+                padding: 0 !important;
+                display: block !important;
+            }
+            #modal-statement > div {
+                box-shadow: none !important;
+                max-width: 100% !important;
+                max-height: none !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
 </head>
-<body class="text-slate-800">
-  <div class="min-h-dvh flex flex-col items-center justify-center md:p-5">
-    <button id="frameBtn" class="mb-3 rounded-full bg-white px-5 py-2 text-sm font-semibold text-sky-700 shadow">
-      <i class="fa-solid fa-mobile-screen-button mr-2"></i>Toggle Full Screen
-    </button>
-    <div id="device" class="phone">
-      <div class="shell">
-        <header class="bg-white border-b border-slate-100 px-5 pt-5 pb-3 flex items-center justify-between">
-          <div>
-            <div class="text-xs tracking-widest font-bold text-sky-600">SKYLEDGER</div>
-            <h1 id="pageTitle" class="font-extrabold text-xl">Daily Register</h1>
-          </div>
-          <div class="flex gap-2">
-            <button id="backupBtn" title="Backup and import" class="w-10 h-10 rounded-xl bg-sky-50 text-sky-700"><i class="fa-solid fa-cloud-arrow-down"></i></button>
-            <button id="addPartyTop" title="Add party" class="w-10 h-10 rounded-xl bg-sky-600 text-white"><i class="fa-solid fa-user-plus"></i></button>
-          </div>
+<body class="text-slate-800 antialiased selection:bg-sky-100 selection:text-sky-900">
+
+    <!-- Mobile App Container -->
+    <div id="app-shell">
+
+        <!-- ================= TOP CLEAN HEADER BAR (MATCHING SCREENSHOT) ================= -->
+        <header class="bg-[#f6f9fc]/95 backdrop-blur-xs px-4 pt-4 pb-2.5 sticky top-0 z-30">
+            <div class="flex items-center justify-between gap-2">
+                <!-- Left: Uppercase Sky-Blue Brand + Bold Dark Title -->
+                <button onclick="openBusinessNameModal()" class="text-left min-w-0 group active:opacity-75 transition">
+                    <p id="header-brand-label" class="text-[11px] font-extrabold uppercase tracking-[0.08em] text-sky-600 leading-tight">EasyPMS.in</p>
+                    <div class="flex items-center gap-1.5 mt-0.5">
+                        <h1 id="header-register-title" class="text-[22px] font-extrabold text-slate-900 tracking-tight leading-none truncate">Daily Register</h1>
+                        <i class="fa-solid fa-pen text-[10px] text-slate-400 opacity-0 group-hover:opacity-100 transition"></i>
+                    </div>
+                </button>
+
+                <!-- Right: Two Rounded-Square Action Buttons -->
+                <div class="flex items-center gap-2.5 shrink-0">
+                    <!-- Soft Light-Blue Backup / Export Button -->
+                    <button onclick="navigateTo('reports')" title="Backup & Reports" class="w-11 h-11 rounded-2xl bg-sky-100/90 hover:bg-sky-200/80 active:scale-95 text-sky-600 flex items-center justify-center text-base transition shadow-2xs">
+                        <i class="fa-solid fa-cloud-arrow-down"></i>
+                    </button>
+                    <!-- Vibrant Sky-Blue Add Party Button -->
+                    <button onclick="openAddPartyModal()" title="Add New Party" class="w-11 h-11 rounded-2xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white flex items-center justify-center text-base transition shadow-sm">
+                        <i class="fa-solid fa-user-plus"></i>
+                    </button>
+                </div>
+            </div>
         </header>
-        <main id="main" class="scroll px-4 py-4"></main>
-        <nav class="nav bg-white border-t border-slate-100 flex justify-around pt-3">
-          <button data-tab="register" class="tab flex flex-col items-center gap-1 text-xs font-semibold"><i class="fa-solid fa-book text-lg"></i>Register</button>
-          <button data-tab="parties" class="tab flex flex-col items-center gap-1 text-xs font-semibold"><i class="fa-solid fa-address-book text-lg"></i>Khatabook</button>
-          <button data-tab="reports" class="tab flex flex-col items-center gap-1 text-xs font-semibold"><i class="fa-solid fa-chart-pie text-lg"></i>Reports</button>
+
+        <!-- ================= MAIN SCROLLABLE CONTENT ================= -->
+        <main class="flex-1 overflow-y-auto pb-24 px-4 pt-1.5 space-y-4">
+
+            <!-- ========================================================= -->
+            <!-- TAB 1: DASHBOARD (EXACT SKYLEDGER DAILY REGISTER LAYOUT)  -->
+            <!-- ========================================================= -->
+            <section id="tab-dashboard" class="space-y-4">
+
+                <!-- 1. Upgraded Modern Date Navigation Card -->
+                <div class="bg-white rounded-2xl p-2 shadow-[0_4px_16px_-4px_rgba(15,23,42,0.06)] border border-slate-200/70 flex items-center justify-between gap-2">
+                    <!-- Previous Day < -->
+                    <button onclick="shiftDashDate(-1)" aria-label="Previous Day" class="w-10 h-11 rounded-xl bg-slate-50 hover:bg-sky-50 border border-slate-100 hover:border-sky-200 active:scale-90 text-slate-600 hover:text-sky-600 flex items-center justify-center transition shrink-0">
+                        <i class="fa-solid fa-chevron-left text-xs"></i>
+                    </button>
+
+                    <!-- Center Interactive Date Picker Trigger -->
+                    <label class="relative flex-1 min-h-[44px] px-3 py-1.5 rounded-xl bg-gradient-to-b from-slate-50/90 to-slate-100/60 hover:from-sky-50/70 hover:to-sky-100/40 border border-slate-200/80 hover:border-sky-300 flex items-center justify-between gap-2 cursor-pointer transition group">
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <div class="w-8 h-8 rounded-lg bg-sky-100/90 text-sky-600 group-hover:bg-sky-600 group-hover:text-white flex items-center justify-center shrink-0 transition">
+                                <i class="fa-regular fa-calendar-days text-xs"></i>
+                            </div>
+                            <div class="min-w-0 leading-tight">
+                                <p id="dash-date-display" class="text-[13px] font-extrabold text-slate-800 tabular-nums truncate">18/11/2026</p>
+                                <p id="dash-date-sub" class="text-[10px] font-semibold text-sky-600 truncate">Wednesday • Today</p>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-caret-down text-xs text-slate-400 group-hover:text-sky-600 transition shrink-0"></i>
+                        <input type="date" id="dash-date-input" onchange="onDashDateChange()" class="absolute inset-0 opacity-0 w-full h-full cursor-pointer">
+                    </label>
+
+                    <!-- Next Day > -->
+                    <button onclick="shiftDashDate(1)" aria-label="Next Day" class="w-10 h-11 rounded-xl bg-slate-50 hover:bg-sky-50 border border-slate-100 hover:border-sky-200 active:scale-90 text-slate-600 hover:text-sky-600 flex items-center justify-center transition shrink-0">
+                        <i class="fa-solid fa-chevron-right text-xs"></i>
+                    </button>
+
+                    <!-- Today Quick Jump Pill -->
+                    <button onclick="setDashToday()" id="dash-today-btn" class="min-h-[44px] px-3.5 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-xs font-bold shadow-xs transition shrink-0 flex items-center gap-1.5">
+                        <i class="fa-solid fa-rotate-left text-[10px]"></i>
+                        <span>Today</span>
+                    </button>
+                </div>
+                <!-- 2. Hero Blue Gradient Card ("Cash in Hand") -->
+                <div class="hero-blue-card rounded-3xl p-5 text-white shadow-[0_12px_28px_-6px_rgba(2,132,199,0.42)] space-y-4">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <p class="text-xs font-semibold text-sky-100/90 tracking-wide">Cash in Hand</p>
+                            <p id="dash-closing-cash" class="text-[32px] font-extrabold tracking-tight tabular-nums leading-tight mt-1">₹0.00</p>
+                        </div>
+                    </div>
+
+                    <!-- 3-Column Metrics Row: Previous Cash | Today Cash | Cash Out -->
+                    <div class="grid grid-cols-3 gap-2 pt-0.5">
+                        <div>
+                            <p class="text-[11px] font-medium text-sky-100/80">Previous Cash</p>
+                            <p id="dash-hero-opening" class="text-xs font-bold tabular-nums mt-0.5 truncate">₹0.00</p>
+                        </div>
+                        <div>
+                            <p class="text-[11px] font-medium text-sky-100/80">Today Cash</p>
+                            <p id="dash-hero-in" class="text-xs font-bold tabular-nums mt-0.5 truncate">₹0.00</p>
+                        </div>
+                        <div>
+                            <p class="text-[11px] font-medium text-sky-100/80">Cash Out</p>
+                            <p id="dash-hero-out" class="text-xs font-bold tabular-nums mt-0.5 truncate">₹0.00</p>
+                        </div>
+                    </div>
+
+                    <!-- Internal Transfer Adjustment Line -->
+                    <p class="text-[11px] font-medium text-sky-100/90 tabular-nums">
+                        Internal transfer adjustment: <span id="dash-hero-transfer-adj" class="font-semibold">₹0.00</span>
+                    </p>
+                </div>
+
+                <!-- 3. Primary Action Buttons Row: ↓ Cash In | ↑ Cash Out -->
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="openCashEntryModal('IN')" class="min-h-[50px] rounded-2xl bg-[#0d9458] hover:bg-[#0b7e4b] active:scale-95 text-white font-bold text-sm shadow-sm transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-arrow-down text-xs"></i>
+                        <span>Cash In</span>
+                    </button>
+                    <button onclick="openCashEntryModal('OUT')" class="min-h-[50px] rounded-2xl bg-[#e11d48] hover:bg-[#be123c] active:scale-95 text-white font-bold text-sm shadow-sm transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-arrow-up text-xs"></i>
+                        <span>Cash Out</span>
+                    </button>
+                </div>
+
+                <!-- 6. Selected Date Transactions List -->
+                <div class="bg-white rounded-2xl border border-slate-100 shadow-[0_2px_10px_rgba(15,23,42,0.03)] overflow-hidden">
+                    <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                        <h3 id="dash-tx-list-title" class="text-xs font-bold uppercase tracking-wider text-slate-600">Entries on 18/11/2026</h3>
+                        <button onclick="navigateTo('ledgers', 'cashbook')" class="text-xs font-bold text-sky-600 hover:underline">Full Cashbook</button>
+                    </div>
+                    <div id="dash-activity-list" class="divide-y divide-slate-100">
+                        <!-- Injected via JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========================================================= -->
+            <!-- TAB 2: LEDGERS (PARTY KHATA + DAILY CASHBOOK)             -->
+            <!-- ========================================================= -->
+            <section id="tab-ledgers" class="hidden space-y-3.5">
+
+                <!-- Sub-Tabs Switcher -->
+                <div class="bg-white p-1 rounded-2xl border border-slate-200/80 shadow-xs grid grid-cols-2 gap-1">
+                    <button id="subtab-btn-parties" onclick="switchLedgerSubTab('parties')" class="min-h-[42px] rounded-xl text-xs font-bold transition-all bg-sky-600 text-white shadow-xs flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-users"></i>
+                        <span>Party Khata</span>
+                    </button>
+                    <button id="subtab-btn-cashbook" onclick="switchLedgerSubTab('cashbook')" class="min-h-[42px] rounded-xl text-xs font-bold transition-all text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-indian-rupee-sign"></i>
+                        <span>Daily Cashbook</span>
+                    </button>
+                </div>
+
+                <!-- SUB-VIEW 2A: PARTY KHATA -->
+                <div id="subview-parties" class="space-y-3">
+                    <!-- Search + Add Party -->
+                    <div class="flex gap-2">
+                        <div class="relative flex-1">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                            <input type="text" id="party-search-input" oninput="renderPartyList()" placeholder="Search party name or phone..." class="w-full min-h-[44px] pl-9 pr-3 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-sky-500">
+                        </div>
+                        <button onclick="openAddPartyModal()" class="min-h-[44px] px-3.5 bg-sky-600 hover:bg-sky-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 shrink-0">
+                            <i class="fa-solid fa-user-plus"></i>
+                            <span>+ New Party</span>
+                        </button>
+                    </div>
+
+                    <!-- Filter Pills -->
+                    <div class="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                        <button onclick="setPartyFilter('ALL')" data-pfilter="ALL" class="pfilter-pill px-3.5 py-2 rounded-full text-xs font-bold bg-sky-600 text-white shrink-0 transition">All</button>
+                        <button onclick="setPartyFilter('GET')" data-pfilter="GET" class="pfilter-pill px-3.5 py-2 rounded-full text-xs font-semibold bg-white text-slate-600 border border-slate-200 shrink-0 transition">To Collect (Milenge)</button>
+                        <button onclick="setPartyFilter('GIVE')" data-pfilter="GIVE" class="pfilter-pill px-3.5 py-2 rounded-full text-xs font-semibold bg-white text-slate-600 border border-slate-200 shrink-0 transition">To Pay (Dene Hain)</button>
+                        <button onclick="setPartyFilter('SETTLED')" data-pfilter="SETTLED" class="pfilter-pill px-3.5 py-2 rounded-full text-xs font-semibold bg-white text-slate-600 border border-slate-200 shrink-0 transition">Settled</button>
+                    </div>
+
+                    <!-- Party Cards List -->
+                    <div id="party-cards-list" class="space-y-2.5">
+                        <!-- Injected via JS -->
+                    </div>
+                </div>
+
+                <!-- SUB-VIEW 2B: DAILY CASHBOOK (ROZNAMCHA) -->
+                <div id="subview-cashbook" class="hidden space-y-3 pb-16">
+                    <!-- Date Selector Pills + Custom Date -->
+                    <div class="bg-white p-3 rounded-2xl border border-slate-100 shadow-xs space-y-2.5">
+                        <div class="flex items-center justify-between gap-1.5">
+                            <div class="flex gap-1.5">
+                                <button onclick="setCashbookPreset('TODAY')" id="cb-btn-today" class="min-h-[38px] px-3 rounded-xl text-xs font-bold bg-sky-600 text-white transition">Today</button>
+                                <button onclick="setCashbookPreset('YESTERDAY')" id="cb-btn-yesterday" class="min-h-[38px] px-3 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Yesterday</button>
+                                <button onclick="setCashbookPreset('ALL')" id="cb-btn-all" class="min-h-[38px] px-3 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">All</button>
+                            </div>
+                            <input type="date" id="cb-date-picker" onchange="onCashbookDatePick()" class="min-h-[38px] px-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                        </div>
+
+                        <!-- Account Mode Filter Strip -->
+                        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-0.5">
+                            <button onclick="setCashbookModeFilter('ALL')" data-cbmode="ALL" class="cbmode-pill px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200 shrink-0">All Accounts</button>
+                            <button onclick="setCashbookModeFilter('Cash Drawer')" data-cbmode="Cash Drawer" class="cbmode-pill px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-slate-50 text-slate-600 border border-slate-200 shrink-0">Cash Drawer</button>
+                            <button onclick="setCashbookModeFilter('Bank Account')" data-cbmode="Bank Account" class="cbmode-pill px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-slate-50 text-slate-600 border border-slate-200 shrink-0">Bank Account</button>
+                        </div>
+
+                        <!-- Opening & Closing Strip -->
+                        <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center">
+                            <div class="bg-slate-50 p-2 rounded-xl">
+                                <p class="text-[10px] font-medium text-slate-500">Opening Cash</p>
+                                <p id="cb-summary-open" class="text-xs font-bold text-slate-700 tabular-nums mt-0.5">₹0.00</p>
+                            </div>
+                            <div class="bg-slate-50 p-2 rounded-xl">
+                                <p class="text-[10px] font-medium text-slate-500">In / Out</p>
+                                <p class="text-[11px] font-bold tabular-nums mt-0.5">
+                                    <span id="cb-summary-in" class="text-emerald-600">+₹0</span> /
+                                    <span id="cb-summary-out" class="text-rose-600">-₹0</span>
+                                </p>
+                            </div>
+                            <div class="bg-sky-50 p-2 rounded-xl border border-sky-100">
+                                <p class="text-[10px] font-semibold text-sky-700">Closing Cash</p>
+                                <p id="cb-summary-close" class="text-xs font-extrabold text-sky-700 tabular-nums mt-0.5">₹0.00</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cashbook Itemized List -->
+                    <div class="bg-white rounded-2xl border border-slate-100 shadow-xs overflow-hidden">
+                        <div class="px-4 py-2.5 bg-slate-50/80 border-b border-slate-100 flex justify-between items-center">
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Roznamcha Entries</span>
+                            <span id="cb-list-count" class="text-[11px] font-semibold text-slate-400">0 entries</span>
+                        </div>
+                        <div id="cb-entries-container" class="divide-y divide-slate-100">
+                            <!-- Injected via JS -->
+                        </div>
+                    </div>
+
+                    <!-- Sticky Bottom Cash In / Cash Out Action Bar -->
+                    <div class="fixed bottom-[68px] left-1/2 -translate-x-1/2 w-full max-w-[480px] px-4 py-2.5 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent z-20">
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <button onclick="openCashEntryModal('IN')" class="min-h-[48px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-xs shadow-md transition flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-plus"></i>
+                                <span>+ CASH IN (Aaya)</span>
+                            </button>
+                            <button onclick="openCashEntryModal('OUT')" class="min-h-[48px] rounded-2xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-extrabold text-xs shadow-md transition flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-minus"></i>
+                                <span>- CASH OUT (Gaya)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========================================================= -->
+            <!-- TAB 3: REPORTS & BACKUP                                   -->
+            <!-- ========================================================= -->
+            <section id="tab-reports" class="hidden space-y-4">
+
+                <!-- Date Range Filter Pills -->
+                <div class="bg-white p-1.5 rounded-2xl border border-slate-100 shadow-xs grid grid-cols-4 gap-1">
+                    <button onclick="setReportRange('TODAY')" data-rrange="TODAY" class="rrange-pill min-h-[38px] rounded-xl text-[11px] font-bold bg-sky-600 text-white transition">Today</button>
+                    <button onclick="setReportRange('WEEK')" data-rrange="WEEK" class="rrange-pill min-h-[38px] rounded-xl text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition">This Week</button>
+                    <button onclick="setReportRange('MONTH')" data-rrange="MONTH" class="rrange-pill min-h-[38px] rounded-xl text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition">This Month</button>
+                    <button onclick="setReportRange('ALL')" data-rrange="ALL" class="rrange-pill min-h-[38px] rounded-xl text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition">All Time</button>
+                </div>
+
+                <!-- Financial Overview Cards -->
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-xs">
+                        <p class="text-[11px] font-semibold text-slate-500">Total Cash Inflow</p>
+                        <p id="rep-total-in" class="text-lg font-extrabold text-emerald-600 mt-0.5">₹0</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5">Income & Receipts</p>
+                    </div>
+                    <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-xs">
+                        <p class="text-[11px] font-semibold text-slate-500">Total Cash Outflow</p>
+                        <p id="rep-total-out" class="text-lg font-extrabold text-rose-600 mt-0.5">₹0</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5">Expenses & Payments</p>
+                    </div>
+                    <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-xs">
+                        <p class="text-[11px] font-semibold text-slate-500">Net Cashflow</p>
+                        <p id="rep-net-cashflow" class="text-lg font-extrabold text-sky-600 mt-0.5">₹0</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5">Inflow minus Outflow</p>
+                    </div>
+                    <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-xs">
+                        <p class="text-[11px] font-semibold text-slate-500">Net Party Position</p>
+                        <p id="rep-net-party" class="text-lg font-extrabold text-indigo-600 mt-0.5">₹0</p>
+                        <p id="rep-net-party-sub" class="text-[10px] text-slate-400 mt-0.5">Receivable vs Payable</p>
+                    </div>
+                </div>
+
+                <!-- Last 7 Days Cash In vs Cash Out Visual Bar Chart -->
+                <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700">Last 7 Days Cashflow</h3>
+                            <p class="text-[11px] text-slate-400">Daily Cash In vs Cash Out</p>
+                        </div>
+                        <div class="flex items-center gap-3 text-[10px] font-bold">
+                            <span class="flex items-center gap-1 text-emerald-600"><span class="w-2.5 h-2.5 rounded-xs bg-emerald-500 inline-block"></span> In</span>
+                            <span class="flex items-center gap-1 text-rose-600"><span class="w-2.5 h-2.5 rounded-xs bg-rose-500 inline-block"></span> Out</span>
+                        </div>
+                    </div>
+                    <!-- Chart Container -->
+                    <div id="rep-7day-chart" class="h-40 pt-4 pb-1 flex items-end justify-between gap-2 border-b border-slate-100">
+                        <!-- Injected via JS -->
+                    </div>
+                </div>
+
+                <!-- Category-Wise Breakdown with Progress Bars -->
+                <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700">Category Breakdown</h3>
+                        <select id="rep-cat-type" onchange="renderReports()" class="text-xs font-bold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-100 focus:outline-none">
+                            <option value="OUT">Expenses (Cash Out)</option>
+                            <option value="IN">Income (Cash In)</option>
+                        </select>
+                    </div>
+                    <div id="rep-category-bars" class="space-y-3">
+                        <!-- Injected via JS -->
+                    </div>
+                </div>
+
+                <!-- Export, Statement & Data Safety Tools -->
+                <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-xs space-y-2.5">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">Statements & Data Backup</h3>
+                    
+                    <button onclick="openStatementModal('ALL')" class="w-full min-h-[46px] px-4 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-[0.99] text-white font-bold text-xs shadow-xs transition flex items-center justify-between">
+                        <span class="flex items-center gap-2.5"><i class="fa-solid fa-file-pdf text-sm"></i> Print / Save PDF Statement</span>
+                        <i class="fa-solid fa-chevron-right text-[10px] opacity-75"></i>
+                    </button>
+
+                    <button onclick="exportCSVBackup()" class="w-full min-h-[46px] px-4 rounded-xl bg-sky-50 hover:bg-sky-100 active:scale-[0.99] text-sky-800 border border-sky-200 font-bold text-xs transition flex items-center justify-between">
+                        <span class="flex items-center gap-2.5"><i class="fa-solid fa-file-csv text-sm text-sky-600"></i> Download CSV Backup (Excel)</span>
+                        <i class="fa-solid fa-download text-xs text-sky-600"></i>
+                    </button>
+
+                    <div class="grid grid-cols-2 gap-2 pt-1">
+                        <button onclick="exportJSONBackup()" class="min-h-[44px] px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-download"></i>
+                        <span>Export JSON</span>
+                    </button>
+                    <label class="min-h-[44px] px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer">
+                        <i class="fa-solid fa-upload"></i>
+                        <span>Restore JSON</span>
+                        <input type="file" accept=".json" onchange="importJSONBackup(event)" class="hidden">
+                    </label>
+                </div>
+
+                <!-- Excel CSV Import Card -->
+                <div class="bg-sky-50/70 p-4 rounded-2xl border border-sky-200/80 shadow-xs space-y-2.5">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg bg-sky-600 text-white flex items-center justify-center text-xs shrink-0">
+                            <i class="fa-solid fa-file-excel"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xs font-bold text-sky-900">Import Excel / CSV Sheet</h3>
+                            <p class="text-[10px] text-sky-700">Columns required: <span class="font-semibold">date, ledger name, cash in, cash out</span></p>
+                        </div>
+                    </div>
+                    <label class="w-full min-h-[44px] px-4 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-[0.99] text-white font-bold text-xs shadow-xs transition flex items-center justify-center gap-2 cursor-pointer">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <span>Upload Excel (CSV) File</span>
+                        <input type="file" accept=".csv, .txt" onchange="importExcelCSV(event)" class="hidden">
+                    </label>
+                </div>
+
+                <div class="pt-2 border-t border-slate-100 space-y-2">
+                        <button onclick="loadSampleWeekData()" class="w-full min-h-[44px] px-4 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 font-bold text-xs transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            <span>Load 1-Week Sample Data</span>
+                        </button>
+                        <button onclick="confirmResetAllData()" class="w-full min-h-[44px] px-4 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200/70 font-bold text-xs transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-trash-can"></i>
+                            <span>Clear Demo Data / Start Fresh</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- ================= BOTTOM 3-TAB NAVIGATION BAR ================= -->
+        <nav class="bg-white border-t border-slate-200/90 px-2 py-1.5 fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] z-30 shadow-[0_-4px_20px_rgba(15,23,42,0.05)]">
+            <div class="grid grid-cols-3 gap-1">
+                <button onclick="navigateTo('dashboard')" id="nav-btn-dashboard" class="min-h-[50px] rounded-xl flex flex-col items-center justify-center gap-1 text-sky-600 bg-sky-50/80 font-bold transition">
+                    <i class="fa-solid fa-house text-base"></i>
+                    <span class="text-[11px]">Dashboard</span>
+                </button>
+                <button onclick="navigateTo('ledgers')" id="nav-btn-ledgers" class="min-h-[50px] rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50 font-semibold transition">
+                    <i class="fa-solid fa-book text-base"></i>
+                    <span class="text-[11px]">Ledgers</span>
+                </button>
+                <button onclick="navigateTo('reports')" id="nav-btn-reports" class="min-h-[50px] rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50 font-semibold transition">
+                    <i class="fa-solid fa-chart-pie text-base"></i>
+                    <span class="text-[11px]">Reports</span>
+                </button>
+            </div>
         </nav>
-      </div>
+
+        <!-- ========================================================= -->
+        <!-- FULL-SCREEN MOBILE DRAWER: PARTY DETAIL LEDGER            -->
+        <!-- ========================================================= -->
+        <div id="drawer-party-detail" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-40 hidden justify-center">
+            <div class="w-full max-w-[480px] bg-slate-50 h-full flex flex-col shadow-2xl">
+                <!-- Party Top Bar -->
+                <div class="bg-white px-4 py-3 border-b border-slate-200 flex items-center justify-between gap-2 shrink-0">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <button onclick="closePartyDrawer()" class="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center shrink-0 active:scale-95">
+                            <i class="fa-solid fa-arrow-left"></i>
+                        </button>
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-1.5">
+                                <h3 id="drawer-party-name" class="text-base font-extrabold text-slate-800 truncate">Party Name</h3>
+                                <span id="drawer-party-badge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 shrink-0">Customer</span>
+                            </div>
+                            <p id="drawer-party-phone" class="text-xs text-slate-500 truncate">+91 98765 43210</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <button onclick="copyWhatsAppReminder()" title="Copy WhatsApp Reminder" class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center text-base active:scale-95">
+                            <i class="fa-brands fa-whatsapp"></i>
+                        </button>
+                        <button onclick="openStatementModal('PARTY')" title="Party Statement" class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 hover:bg-sky-100 flex items-center justify-center text-sm active:scale-95">
+                            <i class="fa-solid fa-print"></i>
+                        </button>
+                        <button onclick="confirmDeleteCurrentParty()" title="Delete Party" class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 flex items-center justify-center text-sm active:scale-95">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Net Balance Summary Strip -->
+                <div class="bg-white px-4 py-3 border-b border-slate-200 flex items-center justify-between shrink-0">
+                    <div>
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Net Balance</p>
+                        <p id="drawer-party-status-text" class="text-xs font-bold text-emerald-600">You Will Get (Milenge)</p>
+                    </div>
+                    <p id="drawer-party-net-amount" class="text-2xl font-extrabold text-emerald-600">₹0</p>
+                </div>
+
+                <!-- Column Header -->
+                <div class="px-4 py-2 bg-slate-100 border-b border-slate-200 flex justify-between text-[10px] font-bold uppercase tracking-wider text-slate-500 shrink-0">
+                    <span>Entry & Running Bal</span>
+                    <div class="flex gap-6 pr-1">
+                        <span class="text-rose-600 w-16 text-right">You Gave</span>
+                        <span class="text-emerald-600 w-16 text-right">You Got</span>
+                    </div>
+                </div>
+
+                <!-- Scrollable Ledger Entries with Running Balance -->
+                <div id="drawer-party-entries" class="flex-1 overflow-y-auto divide-y divide-slate-200/70 bg-white pb-24">
+                    <!-- Injected via JS -->
+                </div>
+
+                <!-- Sticky Bottom Action Buttons: YOU GAVE / YOU GOT -->
+                <div class="bg-white border-t border-slate-200 p-3 grid grid-cols-2 gap-2.5 shrink-0">
+                    <button onclick="openPartyTxModal('GAVE')" class="min-h-[48px] rounded-2xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-extrabold text-xs shadow-sm transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-arrow-up-right"></i>
+                        <span>YOU GAVE ₹ (DIYA)</span>
+                    </button>
+                    <button onclick="openPartyTxModal('GOT')" class="min-h-[48px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-xs shadow-sm transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-arrow-down-left"></i>
+                        <span>YOU GOT ₹ (LIYA)</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- MODALS                                                    -->
+        <!-- ========================================================= -->
+
+        <!-- Modal: Edit Register / Business Title -->
+        <div id="modal-business" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                    <h3 class="text-base font-bold text-slate-800">Register & Brand Name</h3>
+                    <button onclick="closeModal('modal-business')" class="w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <form onsubmit="saveBusinessName(event)" class="space-y-3.5">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Brand Label</label>
+                        <input type="text" id="input-brand-name" required maxlength="25" placeholder="SKYLEDGER" class="w-full min-h-[44px] px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold uppercase focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Register / Shop Title</label>
+                        <input type="text" id="input-business-name" required maxlength="35" placeholder="Daily Register" class="w-full min-h-[44px] px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    </div>
+                    <div class="flex gap-2 pt-1">
+                        <button type="button" onclick="closeModal('modal-business')" class="flex-1 min-h-[44px] rounded-xl border border-slate-200 text-xs font-bold text-slate-600">Cancel</button>
+                        <button type="submit" class="flex-1 min-h-[44px] rounded-xl bg-sky-600 text-white text-xs font-bold">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal: Deposit Cash to Bank / Internal Account Transfer -->
+        <div id="modal-transfer" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                    <h3 id="tr-modal-title" class="text-base font-extrabold text-sky-700">Deposit Cash to Bank</h3>
+                    <button onclick="closeModal('modal-transfer')" class="w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <form id="form-transfer" onsubmit="handleSaveTransfer(event)" class="space-y-3.5 mt-3.5">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">From Account</label>
+                            <select id="tr-from" class="w-full min-h-[44px] px-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                                <option value="Cash Drawer">Cash Drawer</option>
+                                <option value="Bank Account">Bank Account</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">To Account</label>
+                            <select id="tr-to" class="w-full min-h-[44px] px-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                                <option value="Bank Account">Bank Account</option>
+                                <option value="Cash Drawer">Cash Drawer</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Transfer Amount (₹) *</label>
+                        <input type="number" step="0.01" min="0.01" id="tr-amount" required placeholder="0.00" class="w-full min-h-[48px] px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xl font-extrabold tabular-nums focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Reference / Note</label>
+                        <input type="text" id="tr-note" placeholder="e.g. Cash deposited at SBI branch" class="w-full min-h-[44px] px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Date *</label>
+                        <input type="date" id="tr-date" required class="w-full min-h-[44px] px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    </div>
+                    <div class="flex gap-2 pt-2">
+                        <button type="button" onclick="closeModal('modal-transfer')" class="flex-1 min-h-[44px] rounded-xl border border-slate-200 text-xs font-bold text-slate-600">Cancel</button>
+                        <button type="submit" class="flex-1 min-h-[44px] rounded-xl bg-sky-600 text-white text-xs font-bold shadow-xs">Confirm Transfer</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal: Add New Party (with Optional Opening Balance) -->
+        <div id="modal-add-party" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                    <h3 class="text-base font-bold text-slate-800">Add New Party</h3>
+                    <button onclick="closeModal('modal-add-party')" class="w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <form id="form-add-party" onsubmit="handleSaveNewParty(event)" class="space-y-3.5 mt-3.5">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Party Name *</label>
+                        <input type="text" id="np-name" required placeholder="e.g. Verma Kirana Store" class="w-full min-h-[44px] px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Mobile Number</label>
+                        <input type="tel" id="np-phone" placeholder="e.g. 9876543210" class="w-full min-h-[44px] px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Party Type</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="npType" value="Customer" checked class="peer sr-only">
+                                <div class="min-h-[42px] flex items-center justify-center rounded-xl border border-slate-200 text-xs font-bold text-slate-600 peer-checked:bg-sky-50 peer-checked:border-sky-500 peer-checked:text-sky-700">Customer</div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="npType" value="Supplier" class="peer sr-only">
+                                <div class="min-h-[42px] flex items-center justify-center rounded-xl border border-slate-200 text-xs font-bold text-slate-600 peer-checked:bg-sky-50 peer-checked:border-sky-500 peer-checked:text-sky-700">Supplier</div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="pt-1 border-t border-slate-100">
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Opening Balance (Optional)</label>
+                        <div class="flex gap-2">
+                            <input type="number" step="0.01" min="0" id="np-open-amt" placeholder="₹ 0" class="w-1/2 min-h-[44px] px-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-sky-500">
+                            <select id="np-open-type" class="w-1/2 min-h-[44px] px-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                                <option value="GAVE">You Will Get (Milenge)</option>
+                                <option value="GOT">You Will Give (Dene Hain)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 pt-2">
+                        <button type="button" onclick="closeModal('modal-add-party')" class="flex-1 min-h-[44px] rounded-xl border border-slate-200 text-xs font-bold text-slate-600">Cancel</button>
+                        <button type="submit" class="flex-1 min-h-[44px] rounded-xl bg-sky-600 text-white text-xs font-bold shadow-xs">Save Party</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal: Party Transaction (You Gave / You Got) + Quick Party Selector -->
+        <div id="modal-party-tx" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                    <h3 id="ptx-modal-title" class="text-base font-extrabold text-rose-600">You Gave ₹ (Diya)</h3>
+                    <button onclick="closeModal('modal-party-tx')" class="w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <form id="form-party-tx" onsubmit="handleSavePartyTx(event)" class="space-y-3.5 mt-3.5">
+                    <input type="hidden" id="ptx-edit-id">
+                    
+                    <!-- Party Selector (Shown when opened from Dashboard Quick Action) -->
+                    <div id="ptx-party-select-wrap" class="hidden">
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Select Party *</label>
+                        <select id="ptx-party-select" class="w-full min-h-[44px] px-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500">
+                        </select>
+                    </div>
+
+                    <!-- Type Toggle (Shown when opened from Dashboard Quick Action) -->
+                    <div id="ptx-type-toggle-wrap" class="hidden grid grid-cols-2 gap-2">
+                        <button type="button" id="ptx-toggle-gave" onclick="setPartyTxModalType('GAVE')" class="min-h-[42px] rounded-xl font-bold text-xs bg-rose-600 text-white">You Gave (Diya)</button>
+                        <button type="button" id="ptx-toggle-got" onclick="setPartyTxModalType('GOT')" class="min-h-[42px] rounded-xl font-bold text-xs bg-slate-100 text-slate-600">You Got (Liya)</button>
+                    </div>
+
+                    <input type="hidden" id="ptx-type" value="GAVE">
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Amount (₹) *</label>
+                        <input type="number" step="0.01" min="0.01" id="ptx-amount" required placeholder="0.00" class="w-full min-h-[48px] px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xl font-extrabold focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Item / Bill Details</label>
+                        <input type="text" id="ptx-note" placeholder="e.g. Bill #205, Cement 10 bags, UPI payment..." class="w-full min-h-[44px] px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Date *</label>
+                        <input type="date" id="ptx-date" required class="w-full min-h-[44px] px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    </div>
+                    <div class="flex gap-2 pt-2">
+                        <button type="button" onclick="closeModal('modal-party-tx')" class="flex-1 min-h-[44px] rounded-xl border border-slate-200 text-xs font-bold text-slate-600">Cancel</button>
+                        <button type="submit" id="ptx-submit-btn" class="flex-1 min-h-[44px] rounded-xl bg-rose-600 text-white text-xs font-bold shadow-xs">Save Entry</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal: Daily Cashbook Entry (Cash In / Cash Out) -->
+        <div id="modal-cash-entry" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                    <h3 id="ce-modal-title" class="text-base font-extrabold text-emerald-600">+ Cash In (Aaya)</h3>
+                    <button onclick="closeModal('modal-cash-entry')" class="w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <form id="form-cash-entry" onsubmit="handleSaveCashEntry(event)" class="space-y-3.5 mt-3.5">
+                    <input type="hidden" id="ce-edit-id">
+                    
+                    <!-- In / Out Toggle (Shown when opened from Dashboard Quick Action) -->
+                    <div id="ce-type-toggle-wrap" class="hidden grid grid-cols-2 gap-2">
+                        <button type="button" id="ce-toggle-in" onclick="setCashModalType('IN')" class="min-h-[42px] rounded-xl font-bold text-xs bg-emerald-600 text-white">+ Cash In (Aaya)</button>
+                        <button type="button" id="ce-toggle-out" onclick="setCashModalType('OUT')" class="min-h-[42px] rounded-xl font-bold text-xs bg-slate-100 text-slate-600">- Cash Out (Gaya)</button>
+                    </div>
+
+                    <input type="hidden" id="ce-type" value="IN">
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Amount (₹) *</label>
+                        <input type="number" step="0.01" min="0.01" id="ce-amount" required placeholder="0.00" class="w-full min-h-[48px] px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xl font-extrabold focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Category</label>
+                            <select id="ce-category" class="w-full min-h-[44px] px-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                                <option value="Sales">Sales</option>
+                                <option value="Purchase">Purchase</option>
+                                <option value="Party Receipt">Party Receipt</option>
+                                <option value="Rent">Rent</option>
+                                <option value="Staff">Staff</option>
+                                <option value="Utilities">Utilities</option>
+                                <option value="Misc">Misc</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Account / Mode</label>
+                            <select id="ce-mode" class="w-full min-h-[44px] px-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                                <option value="Cash Drawer">Cash Drawer</option>
+                                <option value="Bank Account">Bank Account</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Link Party (Optional)</label>
+                        <select id="ce-party-link" class="w-full min-h-[42px] px-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                            <option value="">-- No Party Linked --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Remark / Description *</label>
+                        <input type="text" id="ce-desc" required placeholder="e.g. Counter cash sales, Shop electricity..." class="w-full min-h-[44px] px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Date *</label>
+                        <input type="date" id="ce-date" required class="w-full min-h-[44px] px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    </div>
+                    <div class="flex gap-2 pt-2">
+                        <button type="button" onclick="closeModal('modal-cash-entry')" class="flex-1 min-h-[44px] rounded-xl border border-slate-200 text-xs font-bold text-slate-600">Cancel</button>
+                        <button type="submit" id="ce-submit-btn" class="flex-1 min-h-[44px] rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-xs">Save Entry</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal: Printable Statement Preview -->
+        <div id="modal-statement" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden items-center justify-center p-3">
+            <div class="bg-white rounded-2xl max-w-lg w-full max-h-[90dvh] flex flex-col shadow-2xl">
+                <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between no-print">
+                    <h3 class="text-sm font-bold text-slate-800">Statement Preview</h3>
+                    <div class="flex items-center gap-2">
+                        <button onclick="window.print()" class="min-h-[36px] px-3 rounded-xl bg-sky-600 text-white text-xs font-bold flex items-center gap-1.5">
+                            <i class="fa-solid fa-print"></i> Print / PDF
+                        </button>
+                        <button onclick="closeModal('modal-statement')" class="w-9 h-9 rounded-xl text-slate-400 hover:bg-slate-100"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                </div>
+                <div id="statement-content" class="p-5 overflow-y-auto space-y-4 text-xs">
+                    <!-- Injected via JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Custom Confirm Dialog (No browser alert/confirm) -->
+        <div id="modal-confirm" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-xs w-full p-5 shadow-2xl text-center space-y-3.5">
+                <div class="w-11 h-11 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto text-lg">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <div>
+                    <h4 id="confirm-title" class="text-sm font-extrabold text-slate-800">Confirm Action</h4>
+                    <p id="confirm-desc" class="text-xs text-slate-500 mt-1">Are you sure you want to proceed?</p>
+                </div>
+                <div class="flex gap-2 pt-1">
+                    <button onclick="closeModal('modal-confirm')" class="flex-1 min-h-[42px] rounded-xl border border-slate-200 text-xs font-bold text-slate-600">Cancel</button>
+                    <button id="confirm-action-btn" class="flex-1 min-h-[42px] rounded-xl bg-rose-600 text-white text-xs font-bold">Yes, Delete</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Feedback Pill -->
+        <div id="toast-pill" class="fixed top-16 left-1/2 -translate-x-1/2 bg-slate-900/95 text-white px-4 py-2 rounded-full text-xs font-semibold shadow-lg opacity-0 pointer-events-none transition-opacity duration-200 z-50 flex items-center gap-2 whitespace-nowrap">
+            <i class="fa-solid fa-circle-check text-emerald-400"></i>
+            <span id="toast-text">Saved</span>
+        </div>
+
     </div>
-  </div>
-  <div id="modalRoot"></div>
-  <input type="file" id="importFile" accept="application/json,.json" class="hidden">
 
-  <script>
-    'use strict';
-    const KEY = 'skyledger_v5';
-    const ACCOUNT_NAMES = { cash: 'Cash Drawer', bank: 'Bank Account', upi: 'UPI', card: 'Card' };
-    
-    const initial = () => ({
-      version: 1,
-      opening: { cash: 0, bank: 0, upi: 0, card: 0 },
-      parties: [],
-      entries: [],
-      transfers: []
-    });
+    <script>
+        // ================= STATE & PERSISTENCE =================
+        const STORAGE_KEY = 'skyledger_daily_register_v4_local';
+        let currentTab = 'dashboard';
+        let currentLedgerSubTab = 'parties';
+        let partyFilter = 'ALL';
+        let cbPreset = 'TODAY';
+        let cbModeFilter = 'ALL';
+        let reportRange = 'ALL';
+        let activePartyId = null;
 
-    let db = load();
-    let tab = 'register';
-    let date = today();
-    let search = '';
-    let partySearch = '';
-
-    function load() {
-      try {
-        const raw = localStorage.getItem(KEY);
-        if (!raw) return initial();
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object') {
-          return {
-            version: 1,
-            opening: parsed.opening || { cash: 0, bank: 0, upi: 0, card: 0 },
-            parties: Array.isArray(parsed.parties) ? parsed.parties : [],
-            entries: Array.isArray(parsed.entries) ? parsed.entries : [],
-            transfers: Array.isArray(parsed.transfers) ? parsed.transfers : []
-          };
-        }
-      } catch (e) {
-        console.error('Error loading data:', e);
-      }
-      return initial();
-    }
-
-    function save() {
-      try {
-        localStorage.setItem(KEY, JSON.stringify(db));
-        return true;
-      } catch (e) {
-        alert('Storage error: Unable to save to browser local storage.');
-        return false;
-      }
-    }
-
-    function today() {
-      const d = new Date();
-      return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
-    }
-
-    function shift(d, n) {
-      const x = new Date(d + 'T12:00:00');
-      x.setDate(x.getDate() + n);
-      return [x.getFullYear(), String(x.getMonth() + 1).padStart(2, '0'), String(x.getDate()).padStart(2, '0')].join('-');
-    }
-
-    function money(n) {
-      return '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
-
-    function esc(v) {
-      return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-    }
-
-    function uid() {
-      return Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
-    }
-
-    function parseNum(v) {
-      const n = parseFloat(v);
-      return isNaN(n) ? 0 : Math.round(n * 100) / 100;
-    }
-
-    function signed(e) {
-      return e.type === 'in' ? e.paid : -e.paid;
-    }
-
-    function accountBalances(until) {
-      const b = { ...db.opening };
-      for (const e of db.entries) {
-        if (!until || e.date <= until) b[e.account] = (b[e.account] || 0) + signed(e);
-      }
-      for (const t of db.transfers) {
-        if (!until || t.date <= until) {
-          b[t.from] = (b[t.from] || 0) - t.amount;
-          b[t.to] = (b[t.to] || 0) + t.amount;
-        }
-      }
-      return b;
-    }
-
-    function cashBefore(d) {
-      const prev = db.entries.filter(e => e.date < d && e.account === 'cash').reduce((s, e) => s + signed(e), 0);
-      const move = db.transfers.filter(t => t.date < d).reduce((s, t) => s + (t.to === 'cash' ? t.amount : 0) - (t.from === 'cash' ? t.amount : 0), 0);
-      return (db.opening.cash || 0) + prev + move;
-    }
-
-    function cashDay(d) {
-      const es = db.entries.filter(e => e.date === d && e.account === 'cash');
-      const incoming = es.filter(e => e.type === 'in').reduce((s, e) => s + e.paid, 0);
-      const outgoing = es.filter(e => e.type === 'out').reduce((s, e) => s + e.paid, 0);
-      const transferNet = db.transfers.filter(t => t.date === d).reduce((s, t) => s + (t.to === 'cash' ? t.amount : 0) - (t.from === 'cash' ? t.amount : 0), 0);
-      const opening = cashBefore(d);
-      return { incoming, outgoing, transferNet, opening, closing: opening + incoming - outgoing + transferNet };
-    }
-
-    function partyBalance(id) {
-      return db.entries.filter(e => e.partyId === id).reduce((s, e) => s + (e.note === 'Due settlement' ? (e.type === 'in' ? -e.paid : e.paid) : (e.type === 'in' ? e.total - e.paid : -(e.total - e.paid))), 0);
-    }
-
-    function partyName(id) {
-      return db.parties.find(p => p.id === id)?.name || 'Unlinked';
-    }
-
-    function render() {
-      try {
-        document.getElementById('pageTitle').textContent = { register: 'Daily Register', parties: 'Party Khatabook', reports: 'Business Reports' }[tab];
-        document.querySelectorAll('.tab').forEach(x => {
-          x.className = 'tab flex flex-col items-center gap-1 text-xs font-semibold ' + (x.dataset.tab === tab ? 'text-sky-600' : 'text-slate-400');
-        });
-        document.getElementById('main').innerHTML = tab === 'register' ? renderRegister() : tab === 'parties' ? renderParties() : renderReports();
-      } catch (err) {
-        console.error('Render error:', err);
-      }
-    }
-
-    function renderRegister() {
-      const c = cashDay(date);
-      const balances = accountBalances(date);
-      const entries = db.entries.filter(e => e.date === date && [e.note, partyName(e.partyId), e.type].join(' ').toLowerCase().includes(search.toLowerCase())).sort((a, b) => b.created - a.created);
-      const transfers = db.transfers.filter(t => t.date === date).map(t => ({ kind: 'transfer', ...t }));
-      const rows = [...entries.map(e => ({ kind: 'entry', ...e })), ...(!search ? transfers : [])].sort((a, b) => b.created - a.created);
-      
-      return `
-        <div class="card p-3 mb-4 flex items-center gap-2">
-          <button data-action="prev" class="px-2 text-sky-600"><i class="fa-solid fa-chevron-left"></i></button>
-          <input id="dateInput" type="date" value="${date}" class="field text-sm flex-1 min-w-0">
-          <button data-action="next" class="px-2 text-sky-600"><i class="fa-solid fa-chevron-right"></i></button>
-          <button data-action="today" class="text-xs bg-sky-100 text-sky-700 rounded-lg px-2 py-3 font-bold">Today</button>
-        </div>
-        <div class="rounded-2xl bg-gradient-to-br from-sky-700 to-sky-500 text-white p-5 shadow-lg shadow-sky-200">
-          <div class="text-sm opacity-85">Closing Cash in Hand</div>
-          <div class="text-3xl font-extrabold mt-1">${money(c.closing)}</div>
-          <div class="grid grid-cols-3 gap-2 mt-5 text-xs">
-            <div><div class="opacity-75">Opening</div><strong>${money(c.opening)}</strong></div>
-            <div><div class="opacity-75">Cash In</div><strong>${money(c.incoming)}</strong></div>
-            <div><div class="opacity-75">Cash Out</div><strong>${money(c.outgoing)}</strong></div>
-          </div>
-          <div class="text-xs mt-3 opacity-90">Internal transfer adjustment: ${money(c.transferNet)}</div>
-          <button data-action="deposit" class="mt-4 w-full rounded-xl bg-white text-sky-700 font-bold py-3"><i class="fa-solid fa-building-columns mr-2"></i>Deposit Cash to Bank</button>
-        </div>
-        <div class="grid grid-cols-2 gap-3 mt-4">
-          <button data-action="add-in" class="btn bg-emerald-600 text-white hover:bg-emerald-700"><i class="fa-solid fa-arrow-down mr-2"></i>Cash In</button>
-          <button data-action="add-out" class="btn bg-rose-600 text-white hover:bg-rose-700"><i class="fa-solid fa-arrow-up mr-2"></i>Cash Out</button>
-        </div>
-        <div class="flex justify-between items-center mt-6 mb-3">
-          <h2 class="font-bold">Account Balances</h2>
-          <button data-action="transfer" class="text-sky-600 text-sm font-bold">Transfer <i class="fa-solid fa-right-left"></i></button>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          ${Object.entries(ACCOUNT_NAMES).map(([k, v]) => `<div class="card p-3"><div class="small">${v}</div><div class="font-extrabold mt-1 text-base">${money(balances[k])}</div></div>`).join('')}
-        </div>
-        <div class="flex items-center justify-between mt-6 mb-3">
-          <h2 class="font-bold">Daily Activity</h2>
-          <span class="text-xs text-slate-500">${rows.length} records</span>
-        </div>
-        <input id="entrySearch" class="field mb-3" placeholder="Search transactions" value="${esc(search)}">
-        ${rows.length ? rows.map(r => r.kind === 'transfer' ? `
-          <div class="card p-3 mb-2 flex gap-3 items-center">
-            <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 grid place-items-center"><i class="fa-solid fa-right-left"></i></div>
-            <div class="flex-1 min-w-0">
-              <div class="font-bold text-sm">${esc(ACCOUNT_NAMES[r.from])} → ${esc(ACCOUNT_NAMES[r.to])}</div>
-              <div class="text-xs text-slate-500">Internal transfer • ${esc(r.note || '')}</div>
-            </div>
-            <div class="text-right"><b>${money(r.amount)}</b><button data-action="delete-transfer" data-id="${r.id}" class="block text-xs text-rose-500 ml-auto mt-1">Delete</button></div>
-          </div>
-        ` : `
-          <div class="card p-3 mb-2 flex gap-3 items-center">
-            <div class="w-10 h-10 rounded-xl ${r.type === 'in' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'} grid place-items-center">
-              <i class="fa-solid fa-${r.type === 'in' ? 'arrow-down' : 'arrow-up'}"></i>
-            </div>
-            <div class="flex-1 min-w-0">
-              <div class="font-bold text-sm truncate">${esc(r.note || partyName(r.partyId))}</div>
-              <div class="text-xs text-slate-500">${esc(ACCOUNT_NAMES[r.account])} • ${esc(r.status)}${r.partyId ? ' • ' + esc(partyName(r.partyId)) : ''}</div>
-              ${r.total > r.paid ? `<div class="text-xs text-amber-600 font-semibold">Due ${money(r.total - r.paid)}</div>` : ''}
-            </div>
-            <div class="text-right">
-              <div class="font-extrabold ${r.type === 'in' ? 'text-emerald-600' : 'text-rose-600'}">${r.type === 'in' ? '+' : '−'}${money(r.paid)}</div>
-              <div class="flex gap-2 justify-end text-xs mt-1">
-                <button data-action="edit-entry" data-id="${r.id}" class="text-sky-600 font-bold">Edit</button>
-                <button data-action="delete-entry" data-id="${r.id}" class="text-rose-500 font-bold">Delete</button>
-              </div>
-            </div>
-          </div>
-        `).join('') : `<div class="card p-8 text-center text-slate-400">No activity for this date.</div>`}
-      `;
-    }
-
-    function renderParties() {
-      const ps = db.parties.filter(p => [p.name, p.phone, p.kind].join(' ').toLowerCase().includes(partySearch.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name));
-      const get = db.parties.reduce((s, p) => s + Math.max(0, partyBalance(p.id)), 0);
-      const give = db.parties.reduce((s, p) => s + Math.max(0, -partyBalance(p.id)), 0);
-      
-      return `
-        <div class="grid grid-cols-2 gap-3 mb-4">
-          <div class="card p-4"><div class="small">You Will Get</div><div class="font-extrabold text-emerald-600 text-xl mt-2">${money(get)}</div></div>
-          <div class="card p-4"><div class="small">You Will Give</div><div class="font-extrabold text-rose-600 text-xl mt-2">${money(give)}</div></div>
-        </div>
-        <button data-action="add-party" class="btn bg-sky-600 text-white w-full mb-4"><i class="fa-solid fa-user-plus mr-2"></i>Add Customer / Supplier</button>
-        <input id="partySearch" class="field mb-4" placeholder="Search name or phone" value="${esc(partySearch)}">
-        ${ps.length ? ps.map(p => {
-          const b = partyBalance(p.id);
-          return `
-            <div class="card p-4 mb-3">
-              <div class="flex justify-between gap-3">
-                <div class="min-w-0">
-                  <div class="font-bold truncate">${esc(p.name)}</div>
-                  <div class="text-xs text-slate-500">${esc(p.kind)}${p.phone ? ' • ' + esc(p.phone) : ''}</div>
-                </div>
-                <div class="text-right">
-                  <div class="font-bold ${b > 0 ? 'text-emerald-600' : b < 0 ? 'text-rose-600' : 'text-slate-500'}">${money(Math.abs(b))}</div>
-                  <div class="text-xs">${b > 0 ? 'You Will Get' : b < 0 ? 'You Will Give' : 'Settled'}</div>
-                </div>
-              </div>
-              <div class="flex flex-wrap gap-3 border-t border-slate-100 pt-3 mt-3 text-xs font-bold">
-                <button data-action="party-detail" data-id="${p.id}" class="text-sky-600">Ledger</button>
-                <button data-action="settle" data-id="${p.id}" class="text-emerald-600" ${Math.abs(b) < 0.005 ? 'disabled' : ''}>Settle Due</button>
-                <button data-action="remind" data-id="${p.id}" class="text-green-600" ${!p.phone || Math.abs(b) < 0.005 ? 'disabled' : ''}><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
-                <button data-action="edit-party" data-id="${p.id}" class="text-slate-500">Edit</button>
-                <button data-action="delete-party" data-id="${p.id}" class="text-rose-500">Delete</button>
-              </div>
-            </div>
-          `;
-        }).join('') : '<div class="card p-8 text-center text-slate-400">No contacts yet.</div>'}
-      `;
-    }
-
-    function renderReports() {
-      const totals = { in: 0, out: 0, dueGet: 0, dueGive: 0 };
-      db.entries.forEach(e => totals[e.type] += e.paid);
-      db.parties.forEach(p => {
-        const b = partyBalance(p.id);
-        totals.dueGet += Math.max(0, b);
-        totals.dueGive += Math.max(0, -b);
-      });
-      const b = accountBalances();
-      
-      return `
-        <div class="card p-5">
-          <div class="small mb-2">All-time received / paid</div>
-          <div class="grid grid-cols-2 gap-4">
-            <div><div class="text-sm text-slate-500">Money In</div><div class="font-extrabold text-emerald-600 text-xl">${money(totals.in)}</div></div>
-            <div><div class="text-sm text-slate-500">Money Out</div><div class="font-extrabold text-rose-600 text-xl">${money(totals.out)}</div></div>
-          </div>
-          <div class="border-t mt-4 pt-3 flex justify-between font-bold"><span>Net Cash Flow</span><span>${money(totals.in - totals.out)}</span></div>
-        </div>
-        <div class="card p-5 mt-4">
-          <div class="font-bold mb-3">Current Accounts</div>
-          ${Object.entries(ACCOUNT_NAMES).map(([k, n]) => `<div class="flex justify-between py-2 border-b last:border-0 text-sm"><span>${n}</span><b>${money(b[k])}</b></div>`).join('')}
-          <div class="flex justify-between pt-3 font-bold text-sky-700"><span>Total Funds</span><span>${money(Object.values(b).reduce((a, v) => a + v, 0))}</span></div>
-        </div>
-        <div class="card p-5 mt-4">
-          <div class="font-bold mb-3">Outstanding Credit</div>
-          <div class="flex justify-between text-sm mb-2"><span>You Will Get</span><b class="text-emerald-600">${money(totals.dueGet)}</b></div>
-          <div class="flex justify-between text-sm"><span>You Will Give</span><b class="text-rose-600">${money(totals.dueGive)}</b></div>
-        </div>
-        <div class="card p-5 mt-4">
-          <h2 class="font-bold mb-2">Data & Statements</h2>
-          <div class="grid grid-cols-2 gap-2">
-            <button data-action="csv" class="btn bg-sky-50 text-sky-700 text-sm font-bold">Export CSV</button>
-            <button data-action="backup" class="btn bg-sky-600 text-white text-sm font-bold">JSON Backup</button>
-            <button data-action="import" class="btn bg-slate-100 text-slate-700 text-sm font-bold">Import JSON</button>
-            <button data-action="opening" class="btn bg-slate-100 text-slate-700 text-sm font-bold">Opening Funds</button>
-          </div>
-        </div>
-      `;
-    }
-
-    function showModal(html) {
-      document.getElementById('modalRoot').innerHTML = `<div class="modal-backdrop" id="overlay"><div class="modal" role="dialog" aria-modal="true">${html}</div></div>`;
-      document.getElementById('overlay').addEventListener('click', e => { if (e.target.id === 'overlay') closeModal(); });
-    }
-
-    function closeModal() { document.getElementById('modalRoot').innerHTML = ''; }
-
-    function header(t) {
-      return `<div class="flex justify-between items-center mb-4"><h2 class="text-xl font-extrabold">${t}</h2><button data-action="close" class="w-9 h-9 bg-slate-100 rounded-xl"><i class="fa-solid fa-xmark"></i></button></div>`;
-    }
-
-    function opts(items, selected) {
-      return items.map(([v, t]) => `<option value="${esc(v)}" ${v === selected ? 'selected' : ''}>${esc(t)}</option>`).join('');
-    }
-
-    function entryModal(type, id) {
-      const e = db.entries.find(x => x.id === id);
-      const v = e || { type, date, account: 'cash', status: 'full', total: '', paid: '', partyId: '', note: '' };
-      
-      showModal(header(e ? 'Edit Transaction' : type === 'in' ? 'Record Cash In' : 'Record Cash Out') + `
-        <form id="entryForm" class="space-y-3" novalidate>
-          <input type="hidden" id="entry_id" value="${esc(id || '')}">
-          <input type="hidden" id="entry_type" value="${type}">
-          <div>
-            <label class="block text-sm font-semibold mb-1">Date</label>
-            <input id="entry_date" type="date" class="field" value="${v.date}">
-          </div>
-          <div>
-            <label class="block text-sm font-semibold mb-1">Description / Notes</label>
-            <input id="entry_note" class="field" maxlength="150" placeholder="e.g. Daily Sales, Tea..." value="${esc(v.note)}">
-          </div>
-          <div>
-            <label class="block text-sm font-semibold mb-1">Total Transaction Amount (₹)</label>
-            <input id="entry_total" type="number" step="any" placeholder="0.00" class="field" value="${v.total}">
-          </div>
-          <div>
-            <label class="block text-sm font-semibold mb-1">Payment Status</label>
-            <select id="entry_status" class="field">${opts([['full', 'Full Received/Paid Now'], ['partial', 'Partial Payment'], ['unpaid', 'Unpaid (Full Credit)']], v.status)}</select>
-          </div>
-          <div id="paidArea">
-            <label class="block text-sm font-semibold mb-1">Amount ${type === 'in' ? 'Received' : 'Paid'} Now (₹)</label>
-            <input id="entry_paid" type="number" step="any" placeholder="0.00" class="field" value="${v.paid}">
-          </div>
-          <div id="duePreview" class="bg-amber-50 text-amber-800 p-3 rounded-xl text-sm font-semibold"></div>
-          <div>
-            <label class="block text-sm font-semibold mb-1">Account</label>
-            <select id="entry_account" class="field">${opts(Object.entries(ACCOUNT_NAMES), v.account)}</select>
-          </div>
-          <div>
-            <label class="block text-sm font-semibold mb-1">Party / Contact (Optional)</label>
-            <select id="entry_party" class="field">
-              <option value="">-- No Linked Party --</option>
-              ${opts(db.parties.map(p => [p.id, p.name + ' (' + p.kind + ')']), v.partyId)}
-            </select>
-          </div>
-          <button class="btn bg-sky-600 text-white w-full mt-2 hover:bg-sky-700" type="submit">Save Transaction</button>
-        </form>
-      `);
-
-      function update() {
-        const status = document.getElementById('entry_status').value;
-        const total = parseNum(document.getElementById('entry_total').value);
-        const paidEl = document.getElementById('entry_paid');
-        const paidArea = document.getElementById('paidArea');
-
-        if (status === 'full') {
-          paidArea.style.display = 'none';
-          paidEl.value = total;
-        } else if (status === 'unpaid') {
-          paidArea.style.display = 'none';
-          paidEl.value = 0;
-        } else {
-          paidArea.style.display = 'block';
+        function getDateOffsetStr(daysOffset = 0) {
+            const d = new Date();
+            d.setDate(d.getDate() + daysOffset);
+            const local = new Date(d.getTime() - (d.getTimezoneOffset() * 60000));
+            return local.toISOString().split('T')[0];
         }
 
-        const paid = parseNum(paidEl.value);
-        const due = Math.max(0, total - paid);
-        document.getElementById('duePreview').textContent = `Remaining Credit / Due: ${money(due)}`;
-      }
-
-      ['entry_status', 'entry_total', 'entry_paid'].forEach(k => {
-        const el = document.getElementById(k);
-        if (el) el.addEventListener('input', update);
-      });
-      update();
-    }
-
-    function partyModal(id) {
-      const p = db.parties.find(x => x.id === id) || { name: '', kind: 'Customer', phone: '' };
-      showModal(header(id ? 'Edit Contact' : 'Add Contact') + `
-        <form id="partyForm" class="space-y-3" novalidate>
-          <input id="party_id" type="hidden" value="${esc(id || '')}">
-          <div>
-            <label class="block text-sm font-semibold mb-1">Name</label>
-            <input id="party_name" class="field" placeholder="Party / Person Name" value="${esc(p.name)}">
-          </div>
-          <div>
-            <label class="block text-sm font-semibold mb-1">Type</label>
-            <select id="party_kind" class="field">${opts([['Customer', 'Customer'], ['Supplier', 'Supplier / Vendor']], p.kind)}</select>
-          </div>
-          <div>
-            <label class="block text-sm font-semibold mb-1">WhatsApp Phone (with Country Code)</label>
-            <input id="party_phone" class="field" placeholder="e.g. 919876543210" value="${esc(p.phone)}">
-          </div>
-          <button class="btn bg-sky-600 text-white w-full mt-2 hover:bg-sky-700" type="submit">Save Contact</button>
-        </form>
-      `);
-    }
-
-    function transferModal(deposit = false) {
-      const b = accountBalances(date);
-      showModal(header(deposit ? 'Deposit Cash to Bank' : 'Transfer Funds') + `
-        <form id="transferForm" class="space-y-3" novalidate>
-          <div>
-            <label class="block text-sm font-semibold mb-1">Date</label>
-            <input id="tr_date" type="date" class="field" value="${date}">
-          </div>
-          <div>
-            <label class="block text-sm font-semibold mb-1">From Account</label>
-            <select id="tr_from" class="field" ${deposit ? 'disabled' : ''}>${opts(Object.entries(ACCOUNT_NAMES), 'cash')}</select>
-          </div>
-          <div>
-            <label class="block text-sm font-semibold mb-1">To Account</label>
-            <select id="tr_to" class="field" ${deposit ? 'disabled' : ''}>${opts(Object.entries(ACCOUNT_NAMES), 'bank')}</select>
-          </div>
-          <div>
-            <label class="block text-sm font-semibold mb-1">Amount (₹)</label>
-            <input id="tr_amount" type="number" step="any" placeholder="0.00" class="field">
-          </div>
-          <div>
-            <label class="block text-sm font-semibold mb-1">Note</label>
-            <input id="tr_note" class="field" placeholder="Optional remark">
-          </div>
-          <p class="text-xs text-slate-500">Available cash drawer balance: ${money(b.cash)}</p>
-          <button class="btn bg-sky-600 text-white w-full mt-2 hover:bg-sky-700" type="submit">Confirm Transfer</button>
-        </form>
-      `);
-    }
-
-    function openingModal() {
-      showModal(header('Initial Account Balances') + `
-        <form id="openingForm" class="space-y-3" novalidate>
-          ${Object.entries(ACCOUNT_NAMES).map(([k, n]) => `
-            <div>
-              <label class="block text-sm font-semibold mb-1">${n}</label>
-              <input id="op_${k}" type="number" step="any" class="field" value="${db.opening[k] || 0}">
-            </div>
-          `).join('')}
-          <button class="btn bg-sky-600 text-white w-full mt-2 hover:bg-sky-700" type="submit">Save Balances</button>
-        </form>
-      `);
-    }
-
-    function detailModal(id) {
-      const p = db.parties.find(x => x.id === id);
-      if (!p) return;
-      const es = db.entries.filter(e => e.partyId === id).sort((a, b) => b.date.localeCompare(a.date));
-      showModal(header(esc(p.name) + ' Ledger') + `
-        <p class="font-bold mb-3">${partyBalance(id) >= 0 ? 'You Will Get' : 'You Will Give'}: ${money(Math.abs(partyBalance(id)))}</p>
-        ${es.length ? es.map(e => `<div class="border-b py-3 text-sm"><div class="flex justify-between"><b>${esc(e.note || 'Transaction')}</b><b>${e.type === 'in' ? '+' : '−'}${money(e.total - e.paid)} due</b></div><div class="text-xs text-slate-500">${e.date} • Total ${money(e.total)} • Paid ${money(e.paid)}</div></div>`).join('') : '<p class="text-slate-500">No ledger entries.</p>'}
-      `);
-    }
-
-    function settleModal(id) {
-      const p = db.parties.find(x => x.id === id), b = partyBalance(id);
-      if (!p || Math.abs(b) < 0.005) return;
-      showModal(header('Settle ' + esc(p.name)) + `
-        <form id="settleForm" class="space-y-3" novalidate>
-          <input id="st_partyId" type="hidden" value="${id}">
-          <div>
-            <label class="block text-sm font-semibold mb-1">Amount (₹)</label>
-            <input id="st_amount" type="number" step="any" value="${Math.abs(b).toFixed(2)}" class="field">
-          </div>
-          <div>
-            <label class="block text-sm font-semibold mb-1">Account</label>
-            <select id="st_account" class="field">${opts(Object.entries(ACCOUNT_NAMES), 'cash')}</select>
-          </div>
-          <button class="btn bg-sky-600 text-white w-full mt-2 hover:bg-sky-700" type="submit">Record Settlement</button>
-        </form>
-      `);
-    }
-
-    function download(name, content, mime) {
-      const url = URL.createObjectURL(new Blob([content], { type: mime }));
-      const a = document.createElement('a'); a.href = url; a.download = name;
-      document.body.append(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1500);
-    }
-
-    function exportCSV() {
-      const rows = [
-        ['Date', 'Type', 'Description', 'Party', 'Account', 'Total', 'Paid', 'Due', 'Status'],
-        ...db.entries.map(e => [e.date, e.type, e.note, partyName(e.partyId), ACCOUNT_NAMES[e.account], e.total, e.paid, (e.total - e.paid).toFixed(2), e.status])
-      ];
-      download('skyledger-statement.csv', '\uFEFF' + rows.map(r => r.join(',')).join('\r\n'), 'text/csv;charset=utf-8');
-    }
-
-    function remind(id) {
-      const p = db.parties.find(x => x.id === id);
-      if (!p || !p.phone) return;
-      const b = partyBalance(id);
-      const phone = p.phone.replace(/\D/g, '');
-      const msg = `Hello ${p.name}, reminder that ${money(Math.abs(b))} is outstanding on your account. Thank you.`;
-      window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank', 'noopener,noreferrer');
-    }
-
-    // Global Click Event Listener
-    document.addEventListener('click', e => {
-      const b = e.target.closest('[data-action]');
-      if (!b) return;
-      const a = b.dataset.action, id = b.dataset.id;
-      if (a === 'prev') date = shift(date, -1);
-      else if (a === 'next') date = shift(date, 1);
-      else if (a === 'today') date = today();
-      else if (a === 'add-in') return entryModal('in');
-      else if (a === 'add-out') return entryModal('out');
-      else if (a === 'edit-entry') { const v = db.entries.find(x => x.id === id); return v && entryModal(v.type, id); }
-      else if (a === 'delete-entry') { db.entries = db.entries.filter(x => x.id !== id); save(); }
-      else if (a === 'delete-transfer') { db.transfers = db.transfers.filter(x => x.id !== id); save(); }
-      else if (a === 'deposit') return transferModal(true);
-      else if (a === 'transfer') return transferModal();
-      else if (a === 'add-party') return partyModal();
-      else if (a === 'edit-party') return partyModal(id);
-      else if (a === 'delete-party') { db.parties = db.parties.filter(x => x.id !== id); save(); }
-      else if (a === 'party-detail') return detailModal(id);
-      else if (a === 'settle') return settleModal(id);
-      else if (a === 'remind') return remind(id);
-      else if (a === 'close') return closeModal();
-      else if (a === 'csv') return exportCSV();
-      else if (a === 'backup') return download('skyledger-backup.json', JSON.stringify(db, null, 2), 'application/json');
-      else if (a === 'opening') return openingModal();
-      render();
-    });
-
-    document.addEventListener('change', e => {
-      if (e.target.id === 'dateInput') { date = e.target.value || today(); render(); }
-    });
-
-    // Form Submit Handlers
-    document.addEventListener('submit', e => {
-      e.preventDefault();
-      const f = e.target;
-
-      if (f.id === 'entryForm') {
-        const id = document.getElementById('entry_id').value;
-        const type = document.getElementById('entry_type').value;
-        const entryDate = document.getElementById('entry_date').value || date;
-        const note = document.getElementById('entry_note').value.trim();
-        const total = parseNum(document.getElementById('entry_total').value);
-        const status = document.getElementById('entry_status').value;
-        const account = document.getElementById('entry_account').value;
-        const partyId = document.getElementById('entry_party').value;
-
-        let paid = 0;
-        if (status === 'full') paid = total;
-        else if (status === 'unpaid') paid = 0;
-        else paid = parseNum(document.getElementById('entry_paid').value);
-
-        if (total <= 0) {
-          alert('Please enter a valid total amount.');
-          return;
+        function getCurrentTimeStr() {
+            return new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
         }
 
-        if ((status === 'partial' || status === 'unpaid') && !partyId) {
-          alert('Please select a party contact to attach the unpaid balance.');
-          return;
+        function formatDDMMYYYY(dateStr) {
+            if (!dateStr) return '';
+            const [y, m, d] = dateStr.split('-');
+            return `${d}/${m}/${y}`;
         }
 
-        const oldIndex = db.entries.findIndex(x => x.id === id);
-        const entryObj = {
-          id: id || uid(),
-          created: oldIndex >= 0 ? db.entries[oldIndex].created : Date.now(),
-          type,
-          date: entryDate,
-          account,
-          status,
-          total,
-          paid,
-          partyId,
-          note
+        function createStarterState() {
+            return {
+                brandName: 'EasyPMS.in',
+                businessName: 'Daily Register',
+                parties: [],
+                partyTx: [],
+                cashbook: [],
+                transfers: []
+            };
+        }
+
+        function loadSampleWeekData() {
+            openConfirm('Load 1-Week Sample Data?', 'This will load realistic last 7 days entries, parties, and cash drawer balances.', () => {
+                state = createStarterState();
+                if (activePartyId) closePartyDrawer();
+                saveState();
+                showToast('1-Week Sample Data Loaded!');
+            });
+        }
+
+        function copyWhatsAppReminder() {
+            const party = state.parties.find(p => p.id === activePartyId);
+            if (!party) return;
+            const net = getPartyNetBalance(party.id);
+            if (net <= 0) {
+                showToast('No balance due to collect');
+                return;
+            }
+
+            const text = `Hello *${party.name}*,\n\nReminder from *${state.businessName}*: Your pending net balance to pay is *${formatINR(net)}*.\n\nPlease clear your dues at your earliest convenience.\n\nThank You!`;
+            
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showToast('WhatsApp reminder copied!');
+            } catch (err) {
+                showToast('Could not copy reminder');
+            }
+            document.body.removeChild(textArea);
+        }
+
+        // ================= 1. DASHBOARD RENDERING =================
+        function renderDashboard() {
+            const selDate = getSelectedDashDate();
+            document.getElementById('dash-date-display').textContent = formatDDMMYYYY(selDate);
+            document.getElementById('dash-tx-list-title').textContent = `Entries on ${formatDDMMYYYY(selDate)}`;
+
+            // Update Day-of-Week & Relative Tag subtitle + Today button state
+            const dateObj = new Date(selDate + 'T00:00:00');
+            const weekdayName = dateObj.toLocaleDateString('en-IN', { weekday: 'long' });
+            const todayStr = getDateOffsetStr(0);
+            const yestStr = getDateOffsetStr(-1);
+            const tomorrowStr = getDateOffsetStr(1);
+
+            let relTag = '';
+            if (selDate === todayStr) relTag = ' • Today';
+            else if (selDate === yestStr) relTag = ' • Yesterday';
+            else if (selDate === tomorrowStr) relTag = ' • Tomorrow';
+
+            const subEl = document.getElementById('dash-date-sub');
+            if (subEl) subEl.textContent = `${weekdayName}${relTag}`;
+
+            const todayBtn = document.getElementById('dash-today-btn');
+            if (todayBtn) {
+                todayBtn.className = selDate === todayStr
+                    ? 'min-h-[44px] px-3.5 rounded-xl bg-sky-50 text-sky-600 border border-sky-200/80 text-xs font-bold transition shrink-0 flex items-center gap-1.5'
+                    : 'min-h-[44px] px-3.5 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-xs font-bold shadow-xs transition shrink-0 flex items-center gap-1.5';
+            }
+
+            // Calculate Previous Cash on selDate (previous day's closing cash drawer balance)
+            const prevDate = new Date(selDate + 'T00:00:00');
+            prevDate.setDate(prevDate.getDate() - 1);
+            const prevLocal = new Date(prevDate.getTime() - (prevDate.getTimezoneOffset() * 60000));
+            const prevDateStr = prevLocal.toISOString().split('T')[0];
+            const previousCash = getAccountBalanceUpToDate('Cash Drawer', prevDateStr);
+
+            // Calculate Today Cash (Cash In) and Cash Out (Expenses / Outflow)
+            let todayCash = 0, cashOut = 0;
+            state.cashbook.forEach(c => {
+                if (c.date === selDate && (c.mode || 'Cash Drawer') === 'Cash Drawer') {
+                    if (c.type === 'IN') todayCash += Number(c.amount);
+                    else cashOut += Number(c.amount);
+                }
+            });
+
+            let transferAdj = 0;
+            (state.transfers || []).forEach(tr => {
+                if (tr.date === selDate) {
+                    if (tr.from === 'Cash Drawer') transferAdj -= Number(tr.amount);
+                    if (tr.to === 'Cash Drawer') transferAdj += Number(tr.amount);
+                }
+            });
+
+            // Available Balance = Previous Cash + Today Cash - Cash Out + Internal Transfer Adjustment
+            const availableBalance = previousCash + todayCash - cashOut + transferAdj;
+            const cashDrawerBal = getAccountBalanceUpToDate('Cash Drawer', selDate);
+
+            const closingCashEl = document.getElementById('dash-closing-cash');
+            closingCashEl.textContent = formatSignedINR(availableBalance);
+            closingCashEl.className = availableBalance < 0
+                ? 'text-[32px] font-extrabold tracking-tight tabular-nums leading-tight mt-1 text-rose-200'
+                : 'text-[32px] font-extrabold tracking-tight tabular-nums leading-tight mt-1 text-white';
+
+            const heroOpeningEl = document.getElementById('dash-hero-opening');
+            heroOpeningEl.textContent = formatSignedINR(previousCash);
+            heroOpeningEl.className = previousCash < 0
+                ? 'text-xs font-bold tabular-nums mt-0.5 truncate text-rose-200'
+                : 'text-xs font-bold tabular-nums mt-0.5 truncate';
+
+            document.getElementById('dash-hero-in').textContent = formatINR(todayCash);
+            document.getElementById('dash-hero-out').textContent = formatINR(cashOut);
+            document.getElementById('dash-hero-transfer-adj').textContent = formatSignedINR(transferAdj);
+
+            // Dashboard Activity List
+            const dayTxs = state.cashbook.filter(c => c.date === selDate).sort((a, b) => b.id.localeCompare(a.id));
+            const actList = document.getElementById('dash-activity-list');
+
+            if (dayTxs.length === 0) {
+                actList.innerHTML = `<div class="p-6 text-center text-xs text-slate-400">No cash entries on ${formatDDMMYYYY(selDate)}. Tap <span class="text-emerald-600 font-bold">Cash In</span> or <span class="text-rose-600 font-bold">Cash Out</span> above.</div>`;
+                return;
+            }
+
+            actList.innerHTML = dayTxs.map(c => {
+                const isIn = c.type === 'IN';
+                return `
+                    <div class="px-4 py-3 flex items-center justify-between gap-3 hover:bg-slate-50">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div class="w-9 h-9 rounded-xl ${isIn ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'} flex items-center justify-center shrink-0 text-xs mt-0.5">
+                                <i class="fa-solid ${isIn ? 'fa-plus' : 'fa-minus'}"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-xs font-bold text-slate-800 truncate">${c.desc}</p>
+                                <div class="flex items-center gap-1.5 flex-wrap mt-1">
+                                    <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-sky-50 text-sky-700">${c.mode || 'Cash Drawer'}</span>
+                                    <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">${c.category}</span>
+                                    <span class="text-[10px] text-slate-400">${formatDateShort(c.date)} • ${c.time || ''}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <p class="text-sm font-extrabold tabular-nums ${isIn ? 'text-emerald-600' : 'text-rose-600'}">${isIn ? '+' : '-'}${formatINR(c.amount)}</p>
+                            <div class="flex items-center justify-end gap-2 mt-1">
+                                <button onclick="editCashEntry('${c.id}')" class="text-[10px] font-bold text-sky-600 hover:underline">Edit</button>
+                                <button onclick="confirmDeleteCash('${c.id}')" class="text-[10px] font-bold text-rose-500 hover:underline">Del</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ================= TRANSFER / DEPOSIT MODAL =================
+        function openTransferModal(defaultFrom, defaultTo, title) {
+            document.getElementById('form-transfer').reset();
+            document.getElementById('tr-modal-title').textContent = title;
+            document.getElementById('tr-from').value = defaultFrom;
+            document.getElementById('tr-to').value = defaultTo;
+            document.getElementById('tr-date').value = getDateOffsetStr(0);
+            openModal('modal-transfer');
+        }
+
+        function handleSaveTransfer(e) {
+            e.preventDefault();
+            const from = document.getElementById('tr-from').value;
+            const to = document.getElementById('tr-to').value;
+            const amount = parseFloat(document.getElementById('tr-amount').value);
+            const note = document.getElementById('tr-note').value.trim();
+            const date = document.getElementById('tr-date').value;
+
+            if (from === to) {
+                showToast('From and To accounts cannot be the same');
+                return;
+            }
+
+            if (!state.transfers) state.transfers = [];
+            state.transfers.push({
+                id: 'tr_' + Date.now(),
+                from,
+                to,
+                amount,
+                note: note || `Transfer from ${from} to ${to}`,
+                date,
+                time: getCurrentTimeStr()
+            });
+
+            saveState();
+            closeModal('modal-transfer');
+            showToast('Transfer recorded successfully');
+        }
+
+        function inspectAccountMode(accountName) {
+            navigateTo('ledgers', 'cashbook');
+            document.getElementById('cb-date-picker').value = '';
+            setCashbookModeFilter(accountName);
+        }
+
+        // ================= 2. DAILY CASHBOOK RENDERING =================
+        function setCashbookPreset(preset) {
+            cbPreset = preset;
+            const today = getDateOffsetStr(0);
+            const yest = getDateOffsetStr(-1);
+
+            ['today', 'yesterday', 'all'].forEach(p => {
+                const btn = document.getElementById(`cb-btn-${p}`);
+                if (btn) {
+                    btn.className = p.toLowerCase() === preset.toLowerCase()
+                        ? 'min-h-[38px] px-3 rounded-xl text-xs font-bold bg-sky-600 text-white transition'
+                        : 'min-h-[38px] px-3 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition';
+                }
+            });
+
+            if (preset === 'TODAY') document.getElementById('cb-date-picker').value = today;
+            else if (preset === 'YESTERDAY') document.getElementById('cb-date-picker').value = yest;
+            else document.getElementById('cb-date-picker').value = '';
+
+            renderCashbook();
+        }
+
+        function onCashbookDatePick() {
+            cbPreset = 'CUSTOM';
+            ['today', 'yesterday', 'all'].forEach(p => {
+                const btn = document.getElementById(`cb-btn-${p}`);
+                if (btn) btn.className = 'min-h-[38px] px-3 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition';
+            });
+            renderCashbook();
+        }
+
+        function setCashbookModeFilter(mode) {
+            cbModeFilter = mode;
+            document.querySelectorAll('.cbmode-pill').forEach(btn => {
+                btn.className = btn.dataset.cbmode === mode
+                    ? 'cbmode-pill px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200 shrink-0'
+                    : 'cbmode-pill px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-slate-50 text-slate-600 border border-slate-200 shrink-0';
+            });
+            renderCashbook();
+        }
+
+        function renderCashbook() {
+            const dateVal = document.getElementById('cb-date-picker').value;
+            const filtered = state.cashbook.filter(c => {
+                if (dateVal && c.date !== dateVal) return false;
+                if (cbModeFilter !== 'ALL' && (c.mode || 'Cash Drawer') !== cbModeFilter) return false;
+                return true;
+            }).sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+
+            let openCash = 0, sumIn = 0, sumOut = 0;
+            if (dateVal) {
+                const prevD = new Date(dateVal + 'T00:00:00');
+                prevD.setDate(prevD.getDate() - 1);
+                const prevDLocal = new Date(prevD.getTime() - (prevD.getTimezoneOffset() * 60000));
+                openCash = getAccountBalanceUpToDate(cbModeFilter === 'ALL' ? 'Cash Drawer' : cbModeFilter, prevDLocal.toISOString().split('T')[0]);
+            }
+
+            filtered.forEach(c => {
+                if (c.type === 'IN') sumIn += Number(c.amount);
+                else sumOut += Number(c.amount);
+            });
+
+            document.getElementById('cb-summary-open').textContent = formatINR(openCash);
+            document.getElementById('cb-summary-in').textContent = '+' + formatINR(sumIn);
+            document.getElementById('cb-summary-out').textContent = '-' + formatINR(sumOut);
+            document.getElementById('cb-summary-close').textContent = formatINR(openCash + sumIn - sumOut);
+            document.getElementById('cb-list-count').textContent = `${filtered.length} entries`;
+
+            const container = document.getElementById('cb-entries-container');
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="p-8 text-center text-xs text-slate-400">No entries found for this filter. Tap <span class="text-emerald-600 font-bold">+ CASH IN</span> or <span class="text-rose-600 font-bold">- CASH OUT</span> below.</div>`;
+                return;
+            }
+
+            container.innerHTML = filtered.map(c => {
+                const isIn = c.type === 'IN';
+                return `
+                    <div class="px-4 py-3 flex items-center justify-between gap-3 hover:bg-slate-50">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div class="w-9 h-9 rounded-xl ${isIn ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'} flex items-center justify-center shrink-0 text-xs mt-0.5">
+                                <i class="fa-solid ${isIn ? 'fa-plus' : 'fa-minus'}"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-xs font-bold text-slate-800 truncate">${c.desc}</p>
+                                <div class="flex items-center gap-1.5 flex-wrap mt-1">
+                                    <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-sky-50 text-sky-700">${c.mode || 'Cash Drawer'}</span>
+                                    <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">${c.category}</span>
+                                    <span class="text-[10px] text-slate-400">${formatDateShort(c.date)} • ${c.time || ''}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <p class="text-sm font-extrabold tabular-nums ${isIn ? 'text-emerald-600' : 'text-rose-600'}">${isIn ? '+' : '-'}${formatINR(c.amount)}</p>
+                            <div class="flex items-center justify-end gap-2 mt-1">
+                                <button onclick="editCashEntry('${c.id}')" class="text-[10px] font-bold text-sky-600 hover:underline">Edit</button>
+                                <button onclick="confirmDeleteCash('${c.id}')" class="text-[10px] font-bold text-rose-500 hover:underline">Del</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function openQuickCashModal() {
+            openCashEntryModal('IN', null, true);
+        }
+
+        function openCashEntryModal(type, editObj = null, showToggle = false) {
+            document.getElementById('form-cash-entry').reset();
+            document.getElementById('ce-edit-id').value = editObj ? editObj.id : '';
+            const activeDate = currentTab === 'dashboard'
+                ? getSelectedDashDate()
+                : (document.getElementById('cb-date-picker').value || getDateOffsetStr(0));
+            document.getElementById('ce-date').value = editObj ? editObj.date : activeDate;
+
+            // Populate optional Party link dropdown
+            const partySel = document.getElementById('ce-party-link');
+            partySel.innerHTML = `<option value="">-- No Party Linked --</option>` +
+                state.parties.map(p => `<option value="${p.id}">${p.name} (${p.type})</option>`).join('');
+
+            const toggleWrap = document.getElementById('ce-type-toggle-wrap');
+            if (showToggle) toggleWrap.classList.remove('hidden');
+            else toggleWrap.classList.add('hidden');
+
+            if (editObj) {
+                document.getElementById('ce-amount').value = editObj.amount;
+                document.getElementById('ce-category').value = editObj.category;
+                document.getElementById('ce-mode').value = editObj.mode || 'Cash Drawer';
+                document.getElementById('ce-desc').value = editObj.desc;
+                partySel.value = editObj.partyId || '';
+            } else {
+                document.getElementById('ce-mode').value = 'Cash Drawer';
+            }
+
+            setCashModalType(type, Boolean(editObj));
+            openModal('modal-cash-entry');
+        }
+
+        function setCashModalType(type, isEdit = false) {
+            document.getElementById('ce-type').value = type;
+            const titleEl = document.getElementById('ce-modal-title');
+            const btnEl = document.getElementById('ce-submit-btn');
+            const tIn = document.getElementById('ce-toggle-in');
+            const tOut = document.getElementById('ce-toggle-out');
+
+            if (!isEdit) {
+                document.getElementById('ce-category').value = type === 'IN' ? 'Sales' : 'Misc';
+            }
+
+            if (type === 'IN') {
+                titleEl.textContent = (isEdit ? 'Edit: ' : '+ ') + 'Cash In (Aaya)';
+                titleEl.className = 'text-base font-extrabold text-emerald-600';
+                btnEl.className = 'flex-1 min-h-[44px] rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-xs';
+                tIn.className = 'min-h-[42px] rounded-xl font-bold text-xs bg-emerald-600 text-white';
+                tOut.className = 'min-h-[42px] rounded-xl font-bold text-xs bg-slate-100 text-slate-600';
+            } else {
+                titleEl.textContent = (isEdit ? 'Edit: ' : '- ') + 'Cash Out (Gaya)';
+                titleEl.className = 'text-base font-extrabold text-rose-600';
+                btnEl.className = 'flex-1 min-h-[44px] rounded-xl bg-rose-600 text-white text-xs font-bold shadow-xs';
+                tOut.className = 'min-h-[42px] rounded-xl font-bold text-xs bg-rose-600 text-white';
+                tIn.className = 'min-h-[42px] rounded-xl font-bold text-xs bg-slate-100 text-slate-600';
+            }
+        }
+
+        function editCashEntry(id) {
+            const item = state.cashbook.find(c => c.id === id);
+            if (item) openCashEntryModal(item.type, item, false);
+        }
+
+        function handleSaveCashEntry(e) {
+            e.preventDefault();
+            const editId = document.getElementById('ce-edit-id').value;
+            const type = document.getElementById('ce-type').value;
+            const amount = parseFloat(document.getElementById('ce-amount').value);
+            const category = document.getElementById('ce-category').value;
+            const mode = document.getElementById('ce-mode').value;
+            const partyId = document.getElementById('ce-party-link').value;
+            const desc = document.getElementById('ce-desc').value.trim();
+            const date = document.getElementById('ce-date').value;
+
+            if (editId) {
+                const idx = state.cashbook.findIndex(c => c.id === editId);
+                if (idx !== -1) state.cashbook[idx] = { ...state.cashbook[idx], amount, category, mode, partyId, desc, date };
+                showToast('Entry updated');
+            } else {
+                state.cashbook.push({
+                    id: 'cb_' + Date.now(),
+                    type,
+                    amount,
+                    category,
+                    mode,
+                    partyId,
+                    desc,
+                    date,
+                    time: getCurrentTimeStr()
+                });
+
+                // If linked to a Party, also log corresponding entry in Party Khata
+                if (partyId) {
+                    state.partyTx.push({
+                        id: 'pt_' + (Date.now() + 1),
+                        partyId,
+                        type: type === 'IN' ? 'GOT' : 'GAVE',
+                        amount,
+                        note: `${desc} (${mode})`,
+                        date,
+                        time: getCurrentTimeStr()
+                    });
+                }
+                showToast(type === 'IN' ? 'Cash In recorded' : 'Cash Out recorded');
+            }
+
+            saveState();
+            closeModal('modal-cash-entry');
+        }
+
+        function confirmDeleteCash(id) {
+            openConfirm('Delete Cash Entry?', 'This Roznamcha record will be removed.', () => {
+                state.cashbook = state.cashbook.filter(c => c.id !== id);
+                saveState();
+                showToast('Entry deleted');
+            });
+        }
+
+        // ================= 3. REPORTS & VISUAL CHARTS =================
+        function setReportRange(range) {
+            reportRange = range;
+            document.querySelectorAll('.rrange-pill').forEach(btn => {
+                btn.className = btn.dataset.rrange === range
+                    ? 'rrange-pill min-h-[38px] rounded-xl text-[11px] font-bold bg-sky-600 text-white transition'
+                    : 'rrange-pill min-h-[38px] rounded-xl text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition';
+            });
+            renderReports();
+        }
+
+        function isDateInReportRange(dateStr) {
+            if (reportRange === 'ALL') return true;
+            const today = getDateOffsetStr(0);
+            if (reportRange === 'TODAY') return dateStr === today;
+            if (reportRange === 'WEEK') return dateStr >= getDateOffsetStr(-6);
+            if (reportRange === 'MONTH') return dateStr.slice(0, 7) === today.slice(0, 7);
+            return true;
+        }
+
+        function renderReports() {
+            const filteredCb = state.cashbook.filter(c => isDateInReportRange(c.date));
+            let totalIn = 0, totalOut = 0;
+            filteredCb.forEach(c => {
+                if (c.type === 'IN') totalIn += Number(c.amount);
+                else totalOut += Number(c.amount);
+            });
+
+            let pGet = 0, pGive = 0;
+            state.parties.forEach(p => {
+                const bal = getPartyNetBalance(p.id);
+                if (bal > 0) pGet += bal;
+                else if (bal < 0) pGive += Math.abs(bal);
+            });
+            const netParty = pGet - pGive;
+
+            document.getElementById('rep-total-in').textContent = formatINR(totalIn);
+            document.getElementById('rep-total-out').textContent = formatINR(totalOut);
+            
+            const netCfEl = document.getElementById('rep-net-cashflow');
+            netCfEl.textContent = formatSignedINR(totalIn - totalOut);
+            netCfEl.className = `text-lg font-extrabold mt-0.5 ${totalIn - totalOut >= 0 ? 'text-sky-600' : 'text-rose-600'}`;
+
+            const netPEl = document.getElementById('rep-net-party');
+            netPEl.textContent = formatSignedINR(netParty);
+            netPEl.className = `text-lg font-extrabold mt-0.5 ${netParty >= 0 ? 'text-emerald-600' : 'text-rose-600'}`;
+            document.getElementById('rep-net-party-sub').textContent = `Get ${formatINR(pGet)} vs Give ${formatINR(pGive)}`;
+
+            // Render Last 7 Days Bar Chart
+            const days = [];
+            for (let i = 6; i >= 0; i--) {
+                const dStr = getDateOffsetStr(-i);
+                const dIn = state.cashbook.filter(c => c.date === dStr && c.type === 'IN').reduce((s, c) => s + Number(c.amount), 0);
+                const dOut = state.cashbook.filter(c => c.date === dStr && c.type === 'OUT').reduce((s, c) => s + Number(c.amount), 0);
+                const label = i === 0 ? 'Today' : dStr.slice(8, 10) + '/' + dStr.slice(5, 7);
+                days.push({ label, dIn, dOut });
+            }
+
+            const maxVal = Math.max(100, ...days.map(d => Math.max(d.dIn, d.dOut)));
+            document.getElementById('rep-7day-chart').innerHTML = days.map(d => {
+                const hIn = Math.max(4, Math.round((d.dIn / maxVal) * 100));
+                const hOut = Math.max(4, Math.round((d.dOut / maxVal) * 100));
+                return `
+                    <div class="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+                        <div class="w-full flex items-end justify-center gap-1 h-28">
+                            <div style="height: ${d.dIn > 0 ? hIn : 3}%" title="In: ${formatINR(d.dIn)}" class="w-2.5 rounded-t-md bg-emerald-500 transition-all duration-300"></div>
+                            <div style="height: ${d.dOut > 0 ? hOut : 3}%" title="Out: ${formatINR(d.dOut)}" class="w-2.5 rounded-t-md bg-rose-500 transition-all duration-300"></div>
+                        </div>
+                        <span class="text-[9px] font-bold text-slate-500 truncate">${d.label}</span>
+                    </div>
+                `;
+            }).join('');
+
+            // Category Breakdown Bars
+            const catType = document.getElementById('rep-cat-type').value;
+            const catEntries = filteredCb.filter(c => c.type === catType);
+            const catTotals = {};
+            let grandCatTotal = 0;
+
+            catEntries.forEach(c => {
+                catTotals[c.category] = (catTotals[c.category] || 0) + Number(c.amount);
+                grandCatTotal += Number(c.amount);
+            });
+
+            const sortedCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+            const catContainer = document.getElementById('rep-category-bars');
+
+            if (sortedCats.length === 0) {
+                catContainer.innerHTML = `<p class="text-xs text-slate-400 text-center py-3">No ${catType === 'IN' ? 'income' : 'expense'} data in selected date range.</p>`;
+                return;
+            }
+
+            catContainer.innerHTML = sortedCats.map(([cat, amt]) => {
+                const pct = grandCatTotal > 0 ? Math.round((amt / grandCatTotal) * 100) : 0;
+                const barColor = catType === 'IN' ? 'bg-emerald-500' : 'bg-sky-500';
+                return `
+                    <div>
+                        <div class="flex justify-between text-xs font-bold mb-1">
+                            <span class="text-slate-700">${cat} <span class="text-[10px] font-semibold text-slate-400">(${pct}%)</span></span>
+                            <span class="text-slate-800">${formatINR(amt)}</span>
+                        </div>
+                        <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div style="width: ${pct}%" class="h-full ${barColor} rounded-full transition-all duration-300"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ================= STATEMENTS, BACKUP & RESET =================
+        function openStatementModal(scope) {
+            const box = document.getElementById('statement-content');
+            const todayStr = formatDateShort(getDateOffsetStr(0)) + ' (' + getDateOffsetStr(0) + ')';
+
+            if (scope === 'PARTY' && activePartyId) {
+                const party = state.parties.find(p => p.id === activePartyId);
+                const txs = state.partyTx.filter(t => t.partyId === party.id).sort((a, b) => a.date.localeCompare(b.date));
+                const net = getPartyNetBalance(party.id);
+
+                box.innerHTML = `
+                    <div class="border-b-2 border-sky-600 pb-2.5 flex justify-between items-end">
+                        <div>
+                            <h2 class="text-base font-extrabold text-sky-700">${state.businessName}</h2>
+                            <p class="text-[11px] text-slate-500">Party Khata Statement • ${state.brandName || 'EasyPMS.in'}</p>
+                        </div>
+                        <p class="text-[10px] text-slate-400">${todayStr}</p>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded-xl flex justify-between items-center">
+                        <div>
+                            <p class="font-bold text-slate-800 text-sm">${party.name}</p>
+                            <p class="text-[11px] text-slate-500">${party.type} • ${party.phone || 'No Phone'}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[10px] text-slate-400 uppercase font-bold">Net Balance</p>
+                            <p class="text-base font-extrabold ${net >= 0 ? 'text-emerald-600' : 'text-rose-600'}">${formatINR(net)} ${net > 0 ? '(Get)' : net < 0 ? '(Give)' : ''}</p>
+                        </div>
+                    </div>
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-300 text-slate-500 text-[10px] uppercase">
+                                <th class="py-1.5">Date</th>
+                                <th class="py-1.5">Note</th>
+                                <th class="py-1.5 text-right text-rose-600">Gave</th>
+                                <th class="py-1.5 text-right text-emerald-600">Got</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200">
+                            ${txs.map(t => `
+                                <tr>
+                                    <td class="py-1.5">${t.date}</td>
+                                    <td class="py-1.5">${t.note || '-'}</td>
+                                    <td class="py-1.5 text-right font-bold text-rose-600">${t.type === 'GAVE' ? formatINR(t.amount) : '-'}</td>
+                                    <td class="py-1.5 text-right font-bold text-emerald-600">${t.type === 'GOT' ? formatINR(t.amount) : '-'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                let pGet = 0, pGive = 0;
+                state.parties.forEach(p => {
+                    const b = getPartyNetBalance(p.id);
+                    if (b > 0) pGet += b; else pGive += Math.abs(b);
+                });
+                const netCash = getAllTimeNetCash();
+
+                box.innerHTML = `
+                    <div class="border-b-2 border-sky-600 pb-2.5 flex justify-between items-end">
+                        <div>
+                            <h2 class="text-base font-extrabold text-sky-700">${state.businessName}</h2>
+                            <p class="text-[11px] text-slate-500">Consolidated Business Report • ${state.brandName || 'EasyPMS.in'}</p>
+                        </div>
+                        <p class="text-[10px] text-slate-400">${todayStr}</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 text-center">
+                        <div class="p-2.5 bg-emerald-50 rounded-xl">
+                            <p class="text-[10px] text-emerald-700 font-bold">To Collect</p>
+                            <p class="text-sm font-extrabold text-emerald-700 mt-0.5">${formatINR(pGet)}</p>
+                        </div>
+                        <div class="p-2.5 bg-rose-50 rounded-xl">
+                            <p class="text-[10px] text-rose-700 font-bold">To Pay</p>
+                            <p class="text-sm font-extrabold text-rose-700 mt-0.5">${formatINR(pGive)}</p>
+                        </div>
+                        <div class="p-2.5 bg-sky-50 rounded-xl">
+                            <p class="text-[10px] text-sky-700 font-bold">Cash in Hand</p>
+                            <p class="text-sm font-extrabold text-sky-700 mt-0.5">${formatSignedINR(netCash)}</p>
+                        </div>
+                    </div>
+                    <h4 class="font-bold text-slate-700 pt-1">All Party Balances</h4>
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-300 text-slate-500 text-[10px] uppercase">
+                                <th class="py-1.5">Party</th>
+                                <th class="py-1.5">Type</th>
+                                <th class="py-1.5 text-right">Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200">
+                            ${state.parties.map(p => {
+                                const b = getPartyNetBalance(p.id);
+                                return `
+                                    <tr>
+                                        <td class="py-1.5 font-semibold">${p.name}</td>
+                                        <td class="py-1.5">${p.type}</td>
+                                        <td class="py-1.5 text-right font-bold ${b > 0 ? 'text-emerald-600' : b < 0 ? 'text-rose-600' : 'text-slate-400'}">
+                                            ${formatINR(b)} ${b > 0 ? '(Get)' : b < 0 ? '(Give)' : ''}
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+            openModal('modal-statement');
+        }
+
+        function exportCSVBackup() {
+            let csv = 'Book,Date,Time,Party_or_Category,Type_Mode,Description,Amount_INR\n';
+            state.partyTx.forEach(t => {
+                const p = state.parties.find(x => x.id === t.partyId);
+                const name = p ? p.name.replace(/,/g, ' ') : 'Party';
+                const note = (t.note || '').replace(/,/g, ' ');
+                csv += `Party Khata,${t.date},${t.time || ''},"${name}",${t.type},"${note}",${t.type === 'GAVE' ? -t.amount : t.amount}\n`;
+            });
+            state.cashbook.forEach(c => {
+                const desc = (c.desc || '').replace(/,/g, ' ');
+                csv += `Roznamcha,${c.date},${c.time || ''},"${c.category}",${c.type} (${c.mode}),"${desc}",${c.type === 'OUT' ? -c.amount : c.amount}\n`;
+            });
+
+            triggerDownload(csv, `${state.businessName.replace(/\s+/g, '_')}_Khata_${getDateOffsetStr(0)}.csv`, 'text/csv');
+            showToast('CSV Backup Downloaded');
+        }
+
+        function exportJSONBackup() {
+            const jsonStr = JSON.stringify(state, null, 2);
+            triggerDownload(jsonStr, `SmartKhata_Backup_${getDateOffsetStr(0)}.json`, 'application/json');
+            showToast('JSON Backup Exported');
+        }
+
+        function importJSONBackup(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if (parsed && Array.isArray(parsed.parties) && Array.isArray(parsed.cashbook)) {
+                        state = parsed;
+                        saveState();
+                        showToast('Backup restored successfully!');
+                    } else {
+                        showToast('Invalid JSON backup file');
+                    }
+                } catch (err) {
+                    showToast('Could not read JSON file');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        // ================= EXCEL / CSV IMPORT (date, ledger name, cash in, cash out) =================
+        function importExcelCSV(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const text = e.target.result;
+                    const lines = text.split(/\r\n|\n/);
+                    if (lines.length < 2) {
+                        showToast('CSV file is empty or missing data');
+                        return;
+                    }
+
+                    // Parse header row to find column indexes
+                    const header = lines[0].toLowerCase().split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+                    const dateIdx = header.findIndex(h => h.includes('date'));
+                    const ledgerIdx = header.findIndex(h => h.includes('ledger') || h.includes('name') || h.includes('desc') || h.includes('particular'));
+                    const inIdx = header.findIndex(h => h.includes('in') || h.includes('receipt') || h.includes('credit'));
+                    const outIdx = header.findIndex(h => h.includes('out') || h.includes('expense') || h.includes('payment') || h.includes('debit'));
+
+                    if (dateIdx === -1 || ledgerIdx === -1) {
+                        showToast('Could not detect "date" or "ledger name" columns in CSV');
+                        return;
+                    }
+
+                    let addedCount = 0;
+                    for (let i = 1; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        if (!line) continue;
+
+                        // Basic CSV split respecting quotes
+                        const cols = [];
+                        let inQuotes = false;
+                        let curCol = '';
+                        for (let c = 0; c < line.length; c++) {
+                            const char = line[c];
+                            if (char === '"') inQuotes = !inQuotes;
+                            else if (char === ',' && !inQuotes) {
+                                cols.push(curCol.trim().replace(/^"|"$/g, ''));
+                                curCol = '';
+                            } else {
+                                curCol += char;
+                            }
+                        }
+                        cols.push(curCol.trim().replace(/^"|"$/g, ''));
+
+                        const dateRaw = cols[dateIdx] || getDateOffsetStr(0);
+                        // Normalize date format if YYYY-MM-DD or DD/MM/YYYY
+                        let formattedDate = dateRaw;
+                        if (dateRaw.includes('/')) {
+                            const parts = dateRaw.split('/');
+                            if (parts.length === 3) {
+                                // Assume DD/MM/YYYY -> YYYY-MM-DD
+                                formattedDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                            }
+                        }
+
+                        const ledgerName = cols[ledgerIdx] || 'General Entry';
+                        const cashInAmt = inIdx !== -1 ? parseFloat(cols[inIdx].replace(/,/g, '')) || 0 : 0;
+                        const cashOutAmt = outIdx !== -1 ? parseFloat(cols[outIdx].replace(/,/g, '')) || 0 : 0;
+
+                        if (cashInAmt > 0) {
+                            state.cashbook.push({
+                                id: 'cb_imp_in_' + Date.now() + '_' + addedCount,
+                                type: 'IN',
+                                amount: cashInAmt,
+                                category: 'Sales',
+                                mode: 'Cash Drawer',
+                                desc: ledgerName,
+                                date: formattedDate,
+                                time: getCurrentTimeStr()
+                            });
+                            addedCount++;
+                        }
+                        if (cashOutAmt > 0) {
+                            state.cashbook.push({
+                                id: 'cb_imp_out_' + Date.now() + '_' + addedCount,
+                                type: 'OUT',
+                                amount: cashOutAmt,
+                                category: 'Misc',
+                                mode: 'Cash Drawer',
+                                desc: ledgerName,
+                                date: formattedDate,
+                                time: getCurrentTimeStr()
+                            });
+                            addedCount++;
+                        }
+                    }
+
+                    saveState();
+                    showToast(`Successfully imported ${addedCount} entries!`);
+                } catch (err) {
+                    console.error(err);
+                    showToast('Error parsing Excel CSV file');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function triggerDownload(content, filename, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function confirmResetAllData() {
+            openConfirm('Start Fresh / Clear Data?', 'This will clear all entries, transfers, and parties so you can start your own Daily Register.', () => {
+                state = {
+                    brandName: state.brandName || 'EasyPMS.in',
+                    businessName: state.businessName || 'Daily Register',
+                    parties: [],
+                    partyTx: [],
+                    cashbook: [],
+                    transfers: []
+                };
+                if (activePartyId) closePartyDrawer();
+                saveState();
+                showToast('All data cleared. Ready to use!');
+            });
+        }
+
+        // ================= HELPER CALCULATIONS & STATEPERSIST =================
+        function loadState() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    return JSON.parse(saved);
+                }
+            } catch (e) {
+                console.error('Could not load localStorage', e);
+            }
+            return createStarterState();
+        }
+
+        let state = loadState();
+
+        function saveState() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            } catch (e) {
+                console.error('Could not save localStorage', e);
+            }
+            refreshAllViews();
+        }
+
+        function formatINR(amount) {
+            const num = Number(amount) || 0;
+            return '₹' + num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function formatSignedINR(amount) {
+            const num = Number(amount) || 0;
+            if (num < 0) {
+                return '-₹' + Math.abs(num).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+            return formatINR(num);
+        }
+
+        function formatDateShort(dateStr) {
+            if (!dateStr) return '';
+            const [y, m, d] = dateStr.split('-');
+            return `${d}/${m}`;
+        }
+
+        function getSelectedDashDate() {
+            const input = document.getElementById('dash-date-input');
+            return input && input.value ? input.value : getDateOffsetStr(0);
+        }
+
+        function shiftDashDate(days) {
+            const input = document.getElementById('dash-date-input');
+            const cur = new Date(getSelectedDashDate() + 'T00:00:00');
+            cur.setDate(cur.getDate() + days);
+            const local = new Date(cur.getTime() - (cur.getTimezoneOffset() * 60000));
+            input.value = local.toISOString().split('T')[0];
+            renderDashboard();
+        }
+
+        function setDashToday() {
+            document.getElementById('dash-date-input').value = getDateOffsetStr(0);
+            renderDashboard();
+        }
+
+        function onDashDateChange() {
+            renderDashboard();
+        }
+
+        function getAccountBalanceUpToDate(accountName, upToDateStr) {
+            let bal = 0;
+            state.cashbook.forEach(c => {
+                if (c.date <= upToDateStr && (c.mode || 'Cash Drawer') === accountName) {
+                    if (c.type === 'IN') bal += Number(c.amount);
+                    else bal -= Number(c.amount);
+                }
+            });
+            (state.transfers || []).forEach(tr => {
+                if (tr.date <= upToDateStr) {
+                    if (tr.from === accountName) bal -= Number(tr.amount);
+                    if (tr.to === accountName) bal += Number(tr.amount);
+                }
+            });
+            return bal;
+        }
+
+        function getAllTimeNetCash() {
+            let cash = 0;
+            state.cashbook.forEach(c => {
+                if ((c.mode || 'Cash Drawer') === 'Cash Drawer') {
+                    if (c.type === 'IN') cash += Number(c.amount);
+                    else cash -= Number(c.amount);
+                }
+            });
+            (state.transfers || []).forEach(tr => {
+                if (tr.from === 'Cash Drawer') cash -= Number(tr.amount);
+                if (tr.to === 'Cash Drawer') cash += Number(tr.amount);
+            });
+            return cash;
+        }
+
+        function getPartyNetBalance(partyId) {
+            let net = 0;
+            state.partyTx.forEach(t => {
+                if (t.partyId === partyId) {
+                    if (t.type === 'GAVE') net -= Number(t.amount);
+                    else if (t.type === 'GOT') net += Number(t.amount);
+                }
+            });
+            return net;
+        }
+
+        function navigateTo(tabId, subTab = null) {
+            currentTab = tabId;
+            ['dashboard', 'ledgers', 'reports'].forEach(t => {
+                const sec = document.getElementById(`tab-${t}`);
+                const btn = document.getElementById(`nav-btn-${t}`);
+                if (sec) {
+                    if (t === tabId) sec.classList.remove('hidden');
+                    else sec.classList.add('hidden');
+                }
+                if (btn) {
+                    if (t === tabId) {
+                        btn.className = 'min-h-[50px] rounded-xl flex flex-col items-center justify-center gap-1 text-sky-600 bg-sky-50/80 font-bold transition';
+                    } else {
+                        btn.className = 'min-h-[50px] rounded-xl flex flex-col items-center justify-center gap-1 text-slate-500 hover:bg-slate-50 font-semibold transition';
+                    }
+                }
+            });
+
+            if (tabId === 'ledgers') {
+                if (subTab) switchLedgerSubTab(subTab);
+                else switchLedgerSubTab(currentLedgerSubTab);
+            } else if (tabId === 'dashboard') {
+                renderDashboard();
+            } else if (tabId === 'reports') {
+                renderReports();
+            }
+        }
+
+        function switchLedgerSubTab(sub) {
+            currentLedgerSubTab = sub;
+            const btnP = document.getElementById('subtab-btn-parties');
+            const btnC = document.getElementById('subtab-btn-cashbook');
+            const viewP = document.getElementById('subview-parties');
+            const viewC = document.getElementById('subview-cashbook');
+
+            if (sub === 'parties') {
+                btnP.className = 'min-h-[42px] rounded-xl text-xs font-bold transition-all bg-sky-600 text-white shadow-xs flex items-center justify-center gap-1.5';
+                btnC.className = 'min-h-[42px] rounded-xl text-xs font-bold transition-all text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-1.5';
+                viewP.classList.remove('hidden');
+                viewC.classList.add('hidden');
+                renderPartyList();
+            } else {
+                btnC.className = 'min-h-[42px] rounded-xl text-xs font-bold transition-all bg-sky-600 text-white shadow-xs flex items-center justify-center gap-1.5';
+                btnP.className = 'min-h-[42px] rounded-xl text-xs font-bold transition-all text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-1.5';
+                viewC.classList.remove('hidden');
+                viewP.classList.add('hidden');
+                renderCashbook();
+            }
+        }
+
+        function setPartyFilter(f) {
+            partyFilter = f;
+            document.querySelectorAll('.pfilter-pill').forEach(btn => {
+                btn.className = btn.dataset.pfilter === f
+                    ? 'pfilter-pill px-3.5 py-2 rounded-full text-xs font-bold bg-sky-600 text-white shrink-0 transition'
+                    : 'pfilter-pill px-3.5 py-2 rounded-full text-xs font-semibold bg-white text-slate-600 border border-slate-200 shrink-0 transition';
+            });
+            renderPartyList();
+        }
+
+        function renderPartyList() {
+            const query = (document.getElementById('party-search-input').value || '').toLowerCase();
+            const listEl = document.getElementById('party-cards-list');
+
+            const filtered = state.parties.filter(p => {
+                const matchQ = p.name.toLowerCase().includes(query) || (p.phone && p.phone.includes(query));
+                if (!matchQ) return false;
+                const net = getPartyNetBalance(p.id);
+                if (partyFilter === 'GET' && net <= 0) return false;
+                if (partyFilter === 'GIVE' && net >= 0) return false;
+                if (partyFilter === 'SETTLED' && net !== 0) return false;
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                listEl.innerHTML = `<div class="bg-white p-8 rounded-2xl text-center text-xs text-slate-400 border border-slate-100">No parties found. Tap <span class="text-sky-600 font-bold">+ New Party</span> above.</div>`;
+                return;
+            }
+
+            listEl.innerHTML = filtered.map(p => {
+                const net = getPartyNetBalance(p.id);
+                const isGet = net > 0;
+                const isGive = net < 0;
+                return `
+                    <div onclick="openPartyDrawer('${p.id}')" class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-2xs hover:border-sky-300 cursor-pointer transition flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div class="w-10 h-10 rounded-xl bg-sky-100/80 text-sky-700 font-extrabold flex items-center justify-center shrink-0 text-sm">
+                                ${p.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-xs font-extrabold text-slate-900 truncate">${p.name}</p>
+                                <p class="text-[11px] text-slate-500 truncate mt-0.5">${p.phone || p.type}</p>
+                            </div>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <p class="text-sm font-extrabold tabular-nums ${isGet ? 'text-emerald-600' : isGive ? 'text-rose-600' : 'text-slate-400'}">${formatINR(Math.abs(net))}</p>
+                            <p class="text-[10px] font-semibold mt-0.5 ${isGet ? 'text-emerald-600' : isGive ? 'text-rose-600' : 'text-slate-400'}">
+                                ${isGet ? 'You will get' : isGive ? 'You will give' : 'Settled'}
+                            </p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function openPartyDrawer(partyId) {
+            activePartyId = partyId;
+            const party = state.parties.find(p => p.id === partyId);
+            if (!party) return;
+
+            document.getElementById('drawer-party-name').textContent = party.name;
+            document.getElementById('drawer-party-phone').textContent = party.phone || party.type;
+            document.getElementById('drawer-party-badge').textContent = party.type;
+
+            const net = getPartyNetBalance(partyId);
+            const statusEl = document.getElementById('drawer-party-status-text');
+            const amtEl = document.getElementById('drawer-party-net-amount');
+
+            amtEl.textContent = formatINR(Math.abs(net));
+            if (net > 0) {
+                statusEl.textContent = 'You Will Get (Milenge)';
+                statusEl.className = 'text-xs font-bold text-emerald-600';
+                amtEl.className = 'text-2xl font-extrabold text-emerald-600';
+            } else if (net < 0) {
+                statusEl.textContent = 'You Will Give (Dene Hain)';
+                statusEl.className = 'text-xs font-bold text-rose-600';
+                amtEl.className = 'text-2xl font-extrabold text-rose-600';
+            } else {
+                statusEl.textContent = 'Settled (Hisab Barabar)';
+                statusEl.className = 'text-xs font-bold text-slate-400';
+                amtEl.className = 'text-2xl font-extrabold text-slate-400';
+            }
+
+            const txs = state.partyTx.filter(t => t.partyId === partyId).sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+            const container = document.getElementById('drawer-party-entries');
+
+            if (txs.length === 0) {
+                container.innerHTML = `<div class="p-8 text-center text-xs text-slate-400">No transactions with this party yet. Tap <span class="text-rose-600 font-bold">YOU GAVE</span> or <span class="text-emerald-600 font-bold">YOU GOT</span> below.</div>`;
+            } else {
+                let running = 0;
+                const sortedAsc = [...txs].reverse();
+                const runningMap = {};
+                sortedAsc.forEach(t => {
+                    if (t.type === 'GAVE') running -= Number(t.amount);
+                    else running += Number(t.amount);
+                    runningMap[t.id] = running;
+                });
+
+                container.innerHTML = txs.map(t => {
+                    const isGave = t.type === 'GAVE';
+                    const runBal = runningMap[t.id];
+                    return `
+                        <div class="px-4 py-3 flex items-center justify-between gap-3 hover:bg-slate-50">
+                            <div class="min-w-0">
+                                <p class="text-xs font-bold text-slate-800 truncate">${t.note || (isGave ? 'You Gave' : 'You Got')}</p>
+                                <p class="text-[10px] text-slate-400 mt-0.5">${formatDateShort(t.date)} • ${t.time || ''} • Bal: <span class="font-semibold text-slate-700">${formatSignedINR(runBal)}</span></p>
+                            </div>
+                            <div class="flex items-center gap-4 shrink-0">
+                                <div class="w-16 text-right">
+                                    <p class="text-sm font-extrabold tabular-nums text-rose-600">${isGave ? formatINR(t.amount) : ''}</p>
+                                </div>
+                                <div class="w-16 text-right">
+                                    <p class="text-sm font-extrabold tabular-nums text-emerald-600">${!isGave ? formatINR(t.amount) : ''}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            const drawer = document.getElementById('drawer-party-detail');
+            drawer.classList.remove('hidden');
+            drawer.classList.add('flex');
+        }
+
+        function closePartyDrawer() {
+            activePartyId = null;
+            const drawer = document.getElementById('drawer-party-detail');
+            drawer.classList.add('hidden');
+            drawer.classList.remove('flex');
+            renderPartyList();
+        }
+
+        // Modal Helpers
+        function openModal(modalId) {
+            const m = document.getElementById(modalId);
+            if (m) {
+                m.classList.remove('hidden');
+                m.classList.add('flex');
+            }
+        }
+
+        function closeModal(modalId) {
+            const m = document.getElementById(modalId);
+            if (m) {
+                m.classList.add('hidden');
+                m.classList.remove('flex');
+            }
+        }
+
+        function openConfirm(title, desc, onConfirm) {
+            document.getElementById('confirm-title').textContent = title;
+            document.getElementById('confirm-desc').textContent = desc;
+            const btn = document.getElementById('confirm-action-btn');
+            btn.onclick = function() {
+                closeModal('modal-confirm');
+                onConfirm();
+            };
+            openModal('modal-confirm');
+        }
+
+        function confirmDeleteCurrentParty() {
+            if (!activePartyId) return;
+            openConfirm('Delete Party?', 'This will remove the party and all associated transactions.', () => {
+                state.parties = state.parties.filter(p => p.id !== activePartyId);
+                state.partyTx = state.partyTx.filter(t => t.partyId !== activePartyId);
+                closePartyDrawer();
+                saveState();
+                showToast('Party deleted');
+            });
+        }
+
+        function openAddPartyModal() {
+            document.getElementById('form-add-party').reset();
+            openModal('modal-add-party');
+        }
+
+        function handleSaveNewParty(e) {
+            e.preventDefault();
+            const name = document.getElementById('np-name').value.trim();
+            const phone = document.getElementById('np-phone').value.trim();
+            const type = document.querySelector('input[name="npType"]:checked').value;
+            const openAmt = parseFloat(document.getElementById('np-open-amt').value) || 0;
+            const openType = document.getElementById('np-open-type').value;
+
+            const newPartyId = 'p_' + Date.now();
+            state.parties.push({ id: newPartyId, name, phone, type });
+
+            if (openAmt > 0) {
+                state.partyTx.push({
+                    id: 'pt_' + Date.now(),
+                    partyId: newPartyId,
+                    type: openType,
+                    amount: openAmt,
+                    note: 'Opening Balance',
+                    date: getDateOffsetStr(0),
+                    time: getCurrentTimeStr()
+                });
+            }
+
+            saveState();
+            closeModal('modal-add-party');
+            showToast('Party added successfully');
+            if (currentTab === 'ledgers' && currentLedgerSubTab === 'parties') {
+                renderPartyList();
+            }
+        }
+
+        function openPartyTxModal(type) {
+            document.getElementById('form-party-tx').reset();
+            document.getElementById('ptx-edit-id').value = '';
+            document.getElementById('ptx-date').value = getDateOffsetStr(0);
+
+            const selectWrap = document.getElementById('ptx-party-select-wrap');
+            const toggleWrap = document.getElementById('ptx-type-toggle-wrap');
+
+            if (activePartyId) {
+                selectWrap.classList.add('hidden');
+                toggleWrap.classList.add('hidden');
+                setPartyTxModalType(type);
+            } else {
+                selectWrap.classList.remove('hidden');
+                toggleWrap.classList.remove('hidden');
+                const sel = document.getElementById('ptx-party-select');
+                sel.innerHTML = state.parties.map(p => `<option value="${p.id}">${p.name} (${p.type})</option>`).join('');
+                setPartyTxModalType(type);
+            }
+            openModal('modal-party-tx');
+        }
+
+        function setPartyTxModalType(type) {
+            document.getElementById('ptx-type').value = type;
+            const titleEl = document.getElementById('ptx-modal-title');
+            const btnEl = document.getElementById('ptx-submit-btn');
+            const tGave = document.getElementById('ptx-toggle-gave');
+            const tGot = document.getElementById('ptx-toggle-got');
+
+            if (type === 'GAVE') {
+                titleEl.textContent = 'You Gave ₹ (Diya)';
+                titleEl.className = 'text-base font-extrabold text-rose-600';
+                btnEl.className = 'flex-1 min-h-[44px] rounded-xl bg-rose-600 text-white text-xs font-bold shadow-xs';
+                tGave.className = 'min-h-[42px] rounded-xl font-bold text-xs bg-rose-600 text-white';
+                tGot.className = 'min-h-[42px] rounded-xl font-bold text-xs bg-slate-100 text-slate-600';
+            } else {
+                titleEl.textContent = 'You Got ₹ (Liya)';
+                titleEl.className = 'text-base font-extrabold text-emerald-600';
+                btnEl.className = 'flex-1 min-h-[44px] rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-xs';
+                tGot.className = 'min-h-[42px] rounded-xl font-bold text-xs bg-emerald-600 text-white';
+                tGave.className = 'min-h-[42px] rounded-xl font-bold text-xs bg-slate-100 text-slate-600';
+            }
+        }
+
+        function handleSavePartyTx(e) {
+            e.preventDefault();
+            const type = document.getElementById('ptx-type').value;
+            const amount = parseFloat(document.getElementById('ptx-amount').value);
+            const note = document.getElementById('ptx-note').value.trim();
+            const date = document.getElementById('ptx-date').value;
+            const targetPartyId = activePartyId || document.getElementById('ptx-party-select').value;
+
+            if (!targetPartyId) {
+                showToast('Please select a party');
+                return;
+            }
+
+            state.partyTx.push({
+                id: 'pt_' + Date.now(),
+                partyId: targetPartyId,
+                type,
+                amount,
+                note,
+                date,
+                time: getCurrentTimeStr()
+            });
+
+            saveState();
+            closeModal('modal-party-tx');
+            showToast('Transaction saved');
+            if (activePartyId) openPartyDrawer(activePartyId);
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast-pill');
+            document.getElementById('toast-text').textContent = msg;
+            toast.style.opacity = '1';
+            setTimeout(() => {
+                toast.style.opacity = '0';
+            }, 2200);
+        }
+
+        function refreshAllViews() {
+            document.getElementById('header-brand-label').textContent = state.brandName || 'EasyPMS.in';
+            document.getElementById('header-register-title').textContent = state.businessName || 'Daily Register';
+
+            if (currentTab === 'dashboard') {
+                renderDashboard();
+            } else if (currentTab === 'ledgers') {
+                if (currentLedgerSubTab === 'parties') renderPartyList();
+                else renderCashbook();
+            } else if (currentTab === 'reports') {
+                renderReports();
+            }
+            if (activePartyId) {
+                openPartyDrawer(activePartyId);
+            }
+        }
+
+        // ================= INITIALIZE APP =================
+        window.onload = function() {
+            const today = getDateOffsetStr(0);
+            document.getElementById('dash-date-input').value = today;
+            document.getElementById('cb-date-picker').value = today;
+            refreshAllViews();
         };
-
-        if (oldIndex >= 0) db.entries[oldIndex] = entryObj;
-        else db.entries.unshift(entryObj);
-      } else if (f.id === 'partyForm') {
-        const id = document.getElementById('party_id').value;
-        const name = document.getElementById('party_name').value.trim();
-        const kind = document.getElementById('party_kind').value;
-        const phone = document.getElementById('party_phone').value.trim();
-
-        if (!name) {
-          alert('Please enter a party name.');
-          return;
-        }
-
-        const oldIndex = db.parties.findIndex(x => x.id === id);
-        const partyObj = { id: id || uid(), name, kind, phone };
-
-        if (oldIndex >= 0) db.parties[oldIndex] = partyObj;
-        else db.parties.push(partyObj);
-      } else if (f.id === 'transferForm') {
-        const trDate = document.getElementById('tr_date').value || date;
-        const from = document.getElementById('tr_from').value;
-        const to = document.getElementById('tr_to').value;
-        const amount = parseNum(document.getElementById('tr_amount').value);
-        const note = document.getElementById('tr_note').value.trim();
-
-        if (amount <= 0 || from === to) {
-          alert('Please enter a valid transfer amount between two different accounts.');
-          return;
-        }
-
-        db.transfers.unshift({ id: uid(), created: Date.now(), date: trDate, from, to, amount, note });
-      } else if (f.id === 'openingForm') {
-        for (const k of Object.keys(ACCOUNT_NAMES)) {
-          const el = document.getElementById(`op_${k}`);
-          if (el) db.opening[k] = parseNum(el.value);
-        }
-      } else if (f.id === 'settleForm') {
-        const partyId = document.getElementById('st_partyId').value;
-        const amount = parseNum(document.getElementById('st_amount').value);
-        const account = document.getElementById('st_account').value;
-        const b = partyBalance(partyId);
-
-        if (amount > 0) {
-          db.entries.unshift({
-            id: uid(), created: Date.now(), date,
-            type: b > 0 ? 'in' : 'out', account,
-            status: 'full', total: amount, paid: amount, partyId, note: 'Due settlement'
-          });
-        }
-      }
-
-      save();
-      closeModal();
-      render();
-    });
-
-    // Tab Navigation
-    document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => { tab = b.dataset.tab; search = ''; render(); }));
-    document.getElementById('addPartyTop').onclick = () => partyModal();
-    document.getElementById('backupBtn').onclick = () => { tab = 'reports'; render(); };
-    document.getElementById('frameBtn').onclick = () => {
-      document.getElementById('device').classList.toggle('full');
-      document.getElementById('frameBtn').innerHTML = document.getElementById('device').classList.contains('full') ? '<i class="fa-solid fa-mobile-screen mr-2"></i>Phone Frame' : '<i class="fa-solid fa-expand mr-2"></i>Toggle Full Screen';
-    };
-
-    render();
-  </script>
+    </script>
 </body>
 </html>
